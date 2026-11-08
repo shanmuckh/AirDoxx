@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "AirDox",
+    name: "AirDoxx",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "AirDox",
-            path: "Sources/AirDox"
+            name: "AirDoxx",
+            path: "Sources/AirDoxx"
         )
     ]
 )

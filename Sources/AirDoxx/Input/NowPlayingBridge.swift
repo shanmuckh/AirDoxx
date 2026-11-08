@@ -2,7 +2,7 @@ import Foundation
 import MediaPlayer
 
 /// Current macOS sends the play/pause, next and previous keys (F7–F9, AirPods, Control Center)
-/// only to the app registered as "Now Playing". While mirroring, AirDox registers
+/// only to the app registered as "Now Playing". While mirroring, AirDoxx registers
 /// itself and forwards those commands to the phone.
 final class NowPlayingBridge {
     /// Receives an Android media keycode.
@@ -14,7 +14,7 @@ final class NowPlayingBridge {
         let center = MPNowPlayingInfoCenter.default()
         center.nowPlayingInfo = [
             MPMediaItemPropertyTitle: title,
-            MPMediaItemPropertyArtist: "AirDox",
+            MPMediaItemPropertyArtist: "AirDoxx",
             MPNowPlayingInfoPropertyPlaybackRate: 1.0,
         ]
         center.playbackState = .playing

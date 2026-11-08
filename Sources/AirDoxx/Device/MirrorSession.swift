@@ -207,6 +207,15 @@ final class MirrorSession {
             try adb.run(["push", server.url.path, ScrcpyServer.remotePath], serial: serial, timeout: 60)
             if isStopped { return }
 
+            // Drop tunnels left behind by a previous run that didn't exit cleanly.
+            if let list = try? adb.run(["forward", "--list"], timeout: 5) {
+                for line in list.split(separator: "\n") {
+                    let parts = line.split(separator: " ")
+                    guard parts.count == 3, parts[0] == serial, parts[2].hasPrefix("localabstract:scrcpy_") else { continue }
+                    _ = try? adb.run(["forward", "--remove", String(parts[1])], serial: serial, timeout: 5)
+                }
+            }
+
             let scid = UInt32.random(in: 0..<0x7FFF_FFFF)
             let scidHex = String(format: "%08x", scid)
             let portText = try adb.run(["forward", "tcp:0", "localabstract:scrcpy_\(scidHex)"], serial: serial, timeout: 10)

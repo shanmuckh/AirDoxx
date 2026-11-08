@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AirDoxx — Your Android phone, on your Mac</title>
+  <meta name="description" content="AirDoxx mirrors and controls your Android phone from your Mac: screen, sound, notifications, keyboard and trackpad. Native, wireless, and free.">
+  <meta name="theme-color" content="#0b0d12">
+  <link rel="icon" href="assets/favicon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="progress" aria-hidden="true"></div>
+  <canvas id="stars" aria-hidden="true"></canvas>
+  <div class="cursor-glow" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="nav">
+    <a class="brand" href="#top"><img src="assets/icon.png" alt="" width="30" height="30"> AirDoxx</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#clipboard">Clipboard</a>
+      <a href="#demo">Demo</a>
+      <a href="#setup">Setup</a>
+      <a href="#keys">Shortcuts</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="btn btn-small" href="https://github.com/shanmuckh/AirDox">GitHub</a>
+  </header>
+
+  <main id="top">
+    <!-- ============ HERO ============ -->
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow reveal">Native for macOS · Android 8+</p>
+        <h1 class="hero-title" aria-label="Your Android, on your Mac.">
+          <span class="line"><span class="word">Your</span> <span class="word grad">Android,</span></span>
+          <span class="line"><span class="word">on</span> <span class="word">your</span> <span class="word grad">Mac.</span></span>
+        </h1>
+        <p class="lede reveal">See your phone's screen, hear its sound, get its notifications, and control it with your keyboard and trackpad. Wireless after one setup. No app needed on the phone.</p>
+        <div class="cta reveal">
+          <a class="btn btn-primary magnetic" href="#setup"><span>Set up in 3 minutes</span></a>
+          <a class="btn btn-ghost magnetic" href="#demo"><span>Try the demo ↓</span></a>
+        </div>
+      </div>
+
+      <div class="stage" aria-hidden="true">
+        <div class="mac">
+          <div class="mac-lid">
+            <div class="mac-screen">
+              <div class="menubar"><i></i><i></i><i></i><i></i><span class="grow"></span><i></i><i></i></div>
+              <div class="mac-window"></div>
+              <div class="mirror-window" data-tilt>
+                <div class="mini-phone">
+                  <div class="punch"></div>
+                  <div class="app-grid"></div>
+                  <div class="mini-dock"><b></b><b></b><b></b><b></b></div>
+                </div>
+              </div>
+              <div class="mac-dock"><i></i><i></i><i></i><i></i><i></i><i class="me"></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+          <div class="mac-base"></div>
+        </div>
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="punch"></div>
+            <div class="lock-time" id="lockTime">9:41</div>
+            <div class="lock-date" id="lockDate">Sunday, 8 November</div>
+            <div class="pulse-ring"></div>
+          </div>
+        </div>
+        <div class="beam"><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="toast-stack" id="heroToasts"></div>
+      </div>
+    </section>
+
+    <!-- ============ MARQUEE ============ -->
+    <section class="marquee" aria-label="Highlights">
+      <div class="marquee-track">
+        <span>60 fps hardware video</span><span>Phone audio on Mac</span><span>Notifications</span><span>Wi-Fi after one pairing</span><span>Trackpad gestures</span><span>Mac function keys</span><span>Universal Clipboard</span><span>Drag &amp; drop files</span><span>90° rotation</span><span>Lock-screen aware</span>
+        <span aria-hidden="true">60 fps hardware video</span><span aria-hidden="true">Phone audio on Mac</span><span aria-hidden="true">Notifications</span><span aria-hidden="true">Wi-Fi after one pairing</span><span aria-hidden="true">Trackpad gestures</span><span aria-hidden="true">Mac function keys</span><span aria-hidden="true">Universal Clipboard</span><span aria-hidden="true">Drag &amp; drop files</span><span aria-hidden="true">90° rotation</span><span aria-hidden="true">Lock-screen aware</span>
+      </div>
+    </section>
+
+    <!-- ============ STORY (sticky scrollytelling) ============ -->
+    <section class="story" id="story">
+      <div class="story-sticky">
+        <div class="story-phone" id="storyPhone" data-step="0">
+          <div class="sp-screen">
+            <div class="punch"></div>
+            <div class="sp-layer sp-mirror"><div class="app-grid big"></div></div>
+            <div class="sp-layer sp-control"><div class="tap-dot"></div><div class="swipe-trail"></div></div>
+            <div class="sp-layer sp-sound"><div class="eq"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><p>Now playing on your Mac</p></div>
+            <div class="sp-layer sp-notify"><div class="notif">💬 <b>Maya</b><br>Dinner at 8?</div><div class="notif n2">📦 <b>Amazon</b><br>Out for delivery</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="story-steps">
+        <article class="story-step" data-step="0"><span class="num">01</span><h2>Mirror.</h2><p>Your phone appears in a phone-shaped window, crisp and smooth at up to 60 frames per second, decoded by your Mac's hardware.</p></article>
+        <article class="story-step" data-step="1"><span class="num">02</span><h2>Control.</h2><p>Click to tap, drag to swipe, two-finger swipe from the edge to go back. Type with your real keyboard. Double-tap, long-press and pinch all work.</p></article>
+        <article class="story-step" data-step="2"><span class="num">03</span><h2>Hear.</h2><p>Reels, music and calls play through your Mac speakers. The phone's media keys answer to F7, F8 and F9.</p></article>
+        <article class="story-step" data-step="3"><span class="num">04</span><h2>Never miss a thing.</h2><p>Phone notifications show up as Mac notifications. Click one and AirDoxx opens that app on your phone.</p></article>
+      </div>
+    </section>
+
+    <!-- ============ UNIVERSAL CLIPBOARD ============ -->
+    <section class="clip" id="clipboard">
+      <h2 class="section-title reveal">Copy here. <span class="grad">Paste there.</span></h2>
+      <p class="sub reveal">Universal Clipboard works both ways, automatically. Copy a link on your phone and paste it on your Mac – or the other way round.</p>
+      <div class="clip-stage reveal" aria-hidden="true">
+        <div class="clip-mac">
+          <div class="clip-win">
+            <div class="clip-bar"><i></i><i></i><i></i></div>
+            <p class="clip-line"><span class="sel" id="macSel">https://maps.app/airdoxx-cafe</span></p>
+            <p class="clip-line dim">Meet at the café at 6?</p>
+            <span class="kbd-chip" id="macChip">⌘C</span>
+          </div>
+        </div>
+        <div class="clip-path">
+          <svg viewBox="0 0 300 120" preserveAspectRatio="none"><path id="clipCurve" d="M10 100 C 90 -20, 210 -20, 290 100" /></svg>
+          <div class="clip-pill" id="clipPill">📋 https://maps.app/airdoxx-cafe</div>
+        </div>
+        <div class="clip-phone">
+          <div class="clip-chat">
+            <div class="bubble in">Where are we meeting?</div>
+            <div class="bubble out" id="phoneBubble">https://maps.app/airdoxx-cafe</div>
+            <div class="clip-input"><span id="phoneInput"></span><b class="caret"></b><span class="paste-chip" id="pasteChip">Paste</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FEATURES (bento + tilt) ============ -->
+    <section class="features" id="features">
+      <h2 class="section-title reveal">Everything iPhone Mirroring does.<br><span class="grad">For Android.</span></h2>
+      <div class="bento">
+        <article class="card big tilt reveal"><div class="glow"></div><div class="icon">📡</div><h3>Wireless, for real</h3><p>Pair once by scanning a QR code, or plug in once. After that AirDoxx finds your phone on Wi-Fi by itself.</p><div class="wifi-anim"><i></i><i></i><i></i></div></article>
+        <article class="card tilt reveal"><div class="glow"></div><div class="icon">🔔</div><h3>Notifications</h3><p>Your phone's alerts, in macOS Notification Center.</p></article>
+        <article class="card tilt reveal"><div class="glow"></div><div class="icon">⌨️</div><h3>Mac keys</h3><p>Volume, brightness, media and F4 search go to the phone.</p></article>
+        <article class="card tilt reveal"><div class="glow"></div><div class="icon">🔄</div><h3>Rotate</h3><p>A clean 90° turn – no window morphing.</p><div class="rotor"></div></article>
+        <article class="card tilt reveal"><div class="glow"></div><div class="icon">🖥️</div><h3>One or both screens</h3><p>Keep the phone dark (Mac only) or show both.</p></article>
+        <article class="card wide tilt reveal"><div class="glow"></div><div class="icon">📋</div><h3>Universal Clipboard</h3><p>Copy on one, paste on the other – automatically, both directions. Text, links, codes.</p></article>
+        <article class="card tilt reveal"><div class="glow"></div><div class="icon">📂</div><h3>Drag &amp; drop</h3><p>Drop a photo to save it to Downloads, drop an APK to install it.</p></article>
+        <article class="card tilt reveal"><div class="glow"></div><div class="icon">⏏︎</div><h3>Disconnect, your way</h3><p>Pause any time, or disconnect permanently to forget the phone.</p></article>
+        <article class="card tilt reveal"><div class="glow"></div><div class="icon">🔒</div><h3>Lock-screen aware</h3><p>Phone screen wakes for your fingerprint, or type the PIN from your Mac.</p></article>
+      </div>
+    </section>
+
+    <!-- ============ INTERACTIVE DEMO ============ -->
+    <section class="demo" id="demo">
+      <h2 class="section-title reveal">Try it right here.</h2>
+      <p class="sub reveal">Hover the window for the toolbar. Tap an app, rotate, or switch screens.</p>
+      <div class="demo-area reveal">
+        <div class="demo-window" id="demoWindow">
+          <div class="demo-toolbar">
+            <span class="lights"><i></i><i></i><i></i></span>
+            <span class="tools">
+              <button type="button" data-act="screens" title="Both screens / Mac only">⧉</button>
+              <button type="button" data-act="rotate" title="Rotate">⟳</button>
+              <button type="button" data-act="back" title="Back">‹</button>
+              <button type="button" data-act="home" title="Home">⌂</button>
+            </span>
+          </div>
+          <div class="demo-phone" id="demoPhone">
+            <div class="demo-screen" id="demoScreen">
+              <div class="punch"></div>
+              <div class="demo-home" id="demoHome"></div>
+              <div class="demo-app" id="demoApp" hidden><div class="app-bar"></div><div class="app-body"></div></div>
+              <div class="gesture-bar"></div>
+            </div>
+          </div>
+        </div>
+        <div class="demo-real-phone" id="realPhone" aria-hidden="true"><div class="rp-screen"></div><span>Phone screen</span></div>
+      </div>
+    </section>
+
+    <!-- ============ SETUP ============ -->
+    <section class="setup" id="setup">
+      <h2 class="section-title reveal">Set up in three minutes.</h2>
+      <p class="sub reveal">You do this once. Then AirDoxx just connects.</p>
+
+      <ol class="steps">
+        <li class="step reveal">
+          <div class="step-art"><div class="mini-settings"><div class="row">About phone</div><div class="row hl" id="buildRow">Build number <span id="tapCount"></span></div><div class="toastline" id="devToast">You are now a developer!</div></div></div>
+          <div class="step-copy"><span class="num">1</span><h3>Unlock Developer options</h3><p>On your phone open <b>Settings › About phone</b> and tap <b>Build number</b> seven times. (On Xiaomi: <b>About phone › OS version</b>.) Enter your PIN if asked.</p></div>
+        </li>
+        <li class="step reveal">
+          <div class="step-art"><div class="mini-settings"><div class="row">Developer options</div><div class="row toggle-row">USB debugging <span class="switch" id="sw1"></span></div><div class="row toggle-row">USB debugging (Security settings) <span class="switch" id="sw2"></span></div></div></div>
+          <div class="step-copy"><span class="num">2</span><h3>Turn on USB debugging</h3><p>Go to <b>Settings › Developer options</b> and switch on <b>USB debugging</b>. On Xiaomi / Redmi / POCO, also switch on <b>USB debugging (Security settings)</b> – otherwise taps and keys won't reach the phone.</p></div>
+        </li>
+        <li class="step reveal">
+          <div class="step-art"><img class="step-icon" src="assets/icon.png" alt="" width="120" height="120"></div>
+          <div class="step-copy"><span class="num">3</span><h3>Install and open AirDoxx</h3><p>Build it from source on your Mac (it lands in <b>Applications</b>), then open it:</p>
+            <pre><code>brew install --cask android-platform-tools
+brew install scrcpy
+git clone https://github.com/shanmuckh/AirDox.git
+cd AirDox &amp;&amp; ./scripts/build_app.sh --install</code></pre>
+            <p>The welcome screen asks for the two Mac permissions right there – <b>Keyboard &amp; Control Keys</b> and <b>Notifications</b>. No digging through System Settings.</p></div>
+        </li>
+        <li class="step reveal">
+          <div class="step-art"><div class="connect-art"><div class="cable"></div><div class="qr-art"></div></div></div>
+          <div class="step-copy"><span class="num">4</span><h3>Connect – once</h3><p><b>With a cable:</b> plug the phone in and tap <b>Allow</b> (tick “Always allow”). AirDoxx moves to Wi-Fi so you can unplug.</p><p><b>Or over Wi-Fi (Android 11+):</b> on the phone open <b>Developer options › Wireless debugging › Pair device with QR code</b> and scan the code AirDoxx shows.</p><p>From then on it reconnects by itself whenever both are on the same Wi-Fi.</p></div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ============ SHORTCUTS ============ -->
+    <section class="keys" id="keys">
+      <h2 class="section-title reveal">Your Mac keys, on your phone.</h2>
+      <p class="sub reveal">Press them on your keyboard – they light up.</p>
+      <div class="keygrid reveal">
+        <div class="key" data-key="F3"><kbd>F3</kbd><span>App switcher</span></div>
+        <div class="key" data-key="F4"><kbd>F4</kbd><span>Search</span></div>
+        <div class="key" data-key="F5"><kbd>F5</kbd><span>Assistant</span></div>
+        <div class="key" data-key="F8"><kbd>F8</kbd><span>Play / pause</span></div>
+        <div class="key" data-key="F11"><kbd>🔉</kbd><span>Volume</span></div>
+        <div class="key" data-key="F2"><kbd>🔆</kbd><span>Brightness</span></div>
+        <div class="key" data-key="1"><kbd>⌘1</kbd><span>Home</span></div>
+        <div class="key" data-key="2"><kbd>⌘2</kbd><span>Recents</span></div>
+        <div class="key" data-key="r"><kbd>⌘R</kbd><span>Rotate</span></div>
+        <div class="key" data-key="p"><kbd>⇧⌘P</kbd><span>Screens</span></div>
+        <div class="key" data-key="Escape"><kbd>esc</kbd><span>Back</span></div>
+        <div class="key" data-key="d"><kbd>⌥⌘D</kbd><span>Do Not Disturb</span></div>
+      </div>
+    </section>
+
+    <!-- ============ FAQ ============ -->
+    <section class="faq" id="faq">
+      <h2 class="section-title reveal">Questions.</h2>
+      <details class="reveal"><summary>Do I need to install anything on the phone?</summary><p>No. AirDoxx uses Android's built-in developer connection. Its small helper runs on the phone only while you mirror and leaves nothing behind.</p></details>
+      <details class="reveal"><summary>Why does it need Developer options?</summary><p>Capturing the screen and simulating touches from a computer is only allowed through Android's debugging interface. It's the same mechanism Android Studio uses.</p></details>
+      <details class="reveal"><summary>Will I have to pair again?</summary><p>No. Once paired, AirDoxx reconnects by itself on the same Wi-Fi. If your phone restarts and Wireless debugging is off, turn it on (or plug in once) and AirDoxx picks it up.</p></details>
+      <details class="reveal"><summary>Why is GPay or my banking app black?</summary><p>Payment and banking apps mark their screens as secure, and Android hides them from every kind of screen capture on purpose. AirDoxx tells you and switches the phone screen on so you can finish there.</p></details>
+      <details class="reveal"><summary>Is it private?</summary><p>Everything stays between your phone and your Mac on your own network. Nothing is uploaded anywhere.</p></details>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <img src="assets/icon.png" alt="" width="44" height="44">
+    <p><b>AirDoxx</b> · Made by <a href="https://github.com/shanmuckh">shanmuckh</a> · <a href="https://github.com/shanmuckh/AirDox">Source on GitHub</a></p>
+    <p class="fine">Uses the open-source scrcpy server (Apache-2.0). Android is a trademark of Google LLC. Not affiliated with Apple or Google.</p>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

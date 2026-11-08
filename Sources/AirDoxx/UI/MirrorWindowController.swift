@@ -131,7 +131,7 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
         window.backgroundColor = .clear
         window.hasShadow = true
         window.isMovableByWindowBackground = false
-        window.title = "AirDox"
+        window.title = "AirDoxx"
         window.collectionBehavior = [.fullScreenNone]
         window.isReleasedWhenClosed = false
         super.init(window: window)
@@ -206,6 +206,8 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
         phoneFrame.addSubview(protectedNotice)
 
         rootView.addSubview(topBar)
+        disconnectButton = topBar.addButton(symbol: "power", tooltip: "Disconnect", target: self,
+                                            action: #selector(disconnectPressed))
         screenModeButton = topBar.addButton(symbol: "macbook.and.iphone", tooltip: "", target: self,
                                             action: #selector(screenModePressed))
         topBar.addButton(symbol: "rotate.right", tooltip: "Rotate: portrait / landscape (⌘R)", target: self,
@@ -218,6 +220,28 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(layoutContent),
                                                name: NSView.frameDidChangeNotification, object: rootView)
     }
+
+    var onDisconnect: (() -> Void)?
+    var onForget: (() -> Void)?
+    private var disconnectButton: NSButton?
+
+    /// Power button: a small menu with "Disconnect" and "Disconnect Permanently…".
+    @objc private func disconnectPressed() {
+        guard let button = disconnectButton else { return }
+        let menu = NSMenu()
+        let a = NSMenuItem(title: "Disconnect", action: #selector(menuDisconnect), keyEquivalent: "")
+        a.target = self
+        a.image = NSImage(systemSymbolName: "pause.circle", accessibilityDescription: nil)
+        let b = NSMenuItem(title: "Disconnect Permanently…", action: #selector(menuForget), keyEquivalent: "")
+        b.target = self
+        b.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil)
+        menu.addItem(a)
+        menu.addItem(b)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+    }
+
+    @objc private func menuDisconnect() { onDisconnect?() }
+    @objc private func menuForget() { onForget?() }
 
     var onToggleScreenMode: (() -> Void)?
     var onRotate: (() -> Void)?

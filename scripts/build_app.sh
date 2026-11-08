@@ -1,21 +1,21 @@
 #!/bin/bash
-# Builds "AirDox.app" into ./build.
+# Builds "AirDoxx.app" into ./build.
 # Bundles adb and the scrcpy server if they're installed (Homebrew or env vars), so the app is self-contained.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-APP_NAME="AirDox"
+APP_NAME="AirDoxx"
 APP="build/$APP_NAME.app"
 CONTENTS="$APP/Contents"
 
 echo "==> Compiling (release)"
 swift build -c release
-BIN="$(swift build -c release --show-bin-path)/AirDox"
+BIN="$(swift build -c release --show-bin-path)/AirDoxx"
 
 echo "==> Assembling $APP"
-rm -rf "$APP"
+rm -rf "${APP:?}"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
-cp "$BIN" "$CONTENTS/MacOS/AirDox"
+cp "$BIN" "$CONTENTS/MacOS/AirDoxx"
 
 cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -24,8 +24,8 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 <dict>
     <key>CFBundleName</key><string>$APP_NAME</string>
     <key>CFBundleDisplayName</key><string>$APP_NAME</string>
-    <key>CFBundleIdentifier</key><string>local.androidmirroring.app</string>
-    <key>CFBundleExecutable</key><string>AirDox</string>
+    <key>CFBundleIdentifier</key><string>com.shanmuckh.airdoxx</string>
+    <key>CFBundleExecutable</key><string>AirDoxx</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
     <key>CFBundleVersion</key><string>1</string>
@@ -40,7 +40,7 @@ PLIST
 
 echo "==> Rendering icon"
 ICONSET="build/AppIcon.iconset"
-rm -rf "$ICONSET"
+rm -rf "${ICONSET:?}"
 swift scripts/make_icon.swift "$ICONSET"
 iconutil -c icns "$ICONSET" -o "$CONTENTS/Resources/AppIcon.icns"
 
@@ -125,3 +125,13 @@ else
 fi
 
 echo "==> Done: $APP"
+
+# --- Install --------------------------------------------------------------------
+# ./scripts/build_app.sh --install  copies the app to /Applications (Finder, Launchpad, Spotlight).
+if [[ "${1:-}" == "--install" ]]; then
+    pkill -x "$APP_NAME" 2>/dev/null || true
+    sleep 1
+    rm -rf "/Applications/${APP_NAME:?}.app"
+    cp -R "$APP" "/Applications/"
+    echo "==> Installed /Applications/$APP_NAME.app"
+fi

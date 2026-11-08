@@ -13,6 +13,19 @@ enum MirrorState: Equatable {
     case failed(String, String)
 }
 
+/// Which window AirDoxx shows (mirrors iPhone Mirroring's behaviour).
+enum Presentation: Equatable {
+    case setup                 // first-run welcome / permissions / connect flow
+    case phone                 // phone-shaped window (connecting spinner or live mirror)
+    case unavailable(String)   // "Unable to Connect to Android Phone" window (detail text, may be empty)
+    case disconnected(String)  // the user disconnected from this phone (name)
+}
+
+enum AirDoxxLinks {
+    static let website = URL(string: "https://shanmuckh.github.io/AirDox/")!
+    static let setupGuide = URL(string: "https://shanmuckh.github.io/AirDox/#setup")!
+}
+
 enum StreamQuality: String, CaseIterable {
     case high, balanced, saver
 
@@ -46,6 +59,10 @@ enum StreamQuality: String, CaseIterable {
 final class AppModel: NSObject, ObservableObject {
     @Published private(set) var state: MirrorState = .searching
     @Published private(set) var devices: [ADBDevice] = []
+    @Published private(set) var presentation: Presentation = .phone
+    let notifications = NotificationBridge()
+    private var searchStartedAt = Date()
+    private var mdnsTick = 0
 
     var windowController: MirrorWindowController!
     private(set) var session: MirrorSession?
@@ -65,12 +82,33 @@ final class AppModel: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        Self.migrateOldSettings()
         defaults.register(defaults: [
             "turnScreenOff": true,
             "audioEnabled": true,
             "quality": StreamQuality.high.rawValue,
             "autoWireless": true,
         ])
+    }
+
+    /// Earlier builds used the bundle id "local.androidmirroring.app"; carry their settings over.
+    private static func migrateOldSettings() {
+        let d = UserDefaults.standard
+        guard !d.bool(forKey: "migratedLegacySettings") else { return }
+        d.set(true, forKey: "migratedLegacySettings")
+        guard let old = UserDefaults(suiteName: "local.androidmirroring.app") else { return }
+        for key in ["turnScreenOff", "audioEnabled", "quality", "autoWireless", "wirelessMap", "lastWirelessAddress"] {
+            if let v = old.object(forKey: key), d.object(forKey: key) == nil { d.set(v, forKey: key) }
+        }
+        // A phone was already connected before: no need for the first-run setup.
+        if old.object(forKey: "wirelessMap") != nil || old.object(forKey: "lastWirelessAddress") != nil {
+            d.set(true, forKey: "setupComplete")
+        }
+    }
+
+    var setupComplete: Bool {
+        get { defaults.bool(forKey: "setupComplete") }
+        set { defaults.set(newValue, forKey: "setupComplete") }
     }
 
     // MARK: - Settings
@@ -121,7 +159,10 @@ final class AppModel: NSObject, ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
-        guard checkDependencies() else { return }
+        presentation = setupComplete ? .phone : .setup
+        searchStartedAt = Date()
+        notifications.onOpen = { [weak self] pkg in self?.openAppOnPhone(pkg) }
+        guard checkDependencies() else { presentation = .unavailable(""); return }
         // Reconnect to phones we've mirrored over Wi-Fi before (no cable needed).
         let addresses = Set(wirelessMap.keys).union(lastWirelessAddress.map { [$0] } ?? [])
         for address in addresses {
@@ -143,9 +184,43 @@ final class AppModel: NSObject, ObservableObject {
         return true
     }
 
+    // MARK: - Windows (iPhone Mirroring–style flow)
+
+    /// Lets the app delegate bring the phone window forward even when `presentation` is already .phone
+    /// (e.g. the hub was opened from a menu).
+    var onShowPhone: (() -> Void)?
+
+    func tryAgain() {
+        presentation = .phone
+        onShowPhone?()
+        retry()
+    }
+
+    func notNow() {
+        NSApp.terminate(nil)
+    }
+
+    func learnMore() {
+        NSWorkspace.shared.open(AirDoxxLinks.website)
+    }
+
+    func beginSetup() {
+        presentation = .setup
+        if state != .searching, session == nil { retry() }
+    }
+
+    /// Called by the setup flow once a phone is connected (or the user skips ahead).
+    func finishSetup() {
+        setupComplete = true
+        presentation = .phone
+        onShowPhone?()
+        if session == nil { retry() }
+    }
+
     func retry() {
-        guard checkDependencies() else { return }
+        guard checkDependencies() else { presentation = .unavailable(""); return }
         autoConnect = true
+        searchStartedAt = Date()
         state = .searching
         if pollTimer == nil {
             pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in self?.poll() }
@@ -160,10 +235,26 @@ final class AppModel: NSObject, ObservableObject {
         }
     }
 
+    private var forgottenPhonesSnapshot: Set<String> = []
+
     private func poll() {
         guard isLookingForDevices, !polling else { return }
+        forgottenPhonesSnapshot = presentation == .setup ? [] : forgottenPhones
         polling = true
+        mdnsTick += 1
+        let discover = mdnsTick % 3 == 1
         work.async { [weak self] in
+            // Phones paired via Wireless debugging advertise themselves on the network:
+            // connect to them automatically (no pairing again, no cable).
+            if discover {
+                let connected = Set(((try? ADB.shared.devices()) ?? []).map(\.serial))
+                let skip = self?.forgottenPhonesSnapshot ?? []
+                for svc in ADB.shared.mdnsServices() where svc.type.hasPrefix("_adb-tls-connect") {
+                    if connected.contains(svc.address) || connected.contains(where: { $0.hasPrefix(svc.name) }) { continue }
+                    if let hw = svc.hardwareSerial, skip.contains(hw) { continue }
+                    _ = try? ADB.shared.run(["connect", svc.address], timeout: 5)
+                }
+            }
             let found = (try? ADB.shared.devices()) ?? []
             DispatchQueue.main.async {
                 self?.polling = false
@@ -175,11 +266,26 @@ final class AppModel: NSObject, ObservableObject {
     private func handle(_ found: [ADBDevice]) {
         devices = found
         guard isLookingForDevices else { return }
-        var ready = found.filter(\.isReady)
-        // The same phone over USB and Wi-Fi shows up twice: keep the Wi-Fi one.
-        let map = wirelessMap
-        let phonesOnWiFi = Set(ready.filter(\.isWireless).compactMap { map[$0.serial] })
-        ready.removeAll { !$0.isWireless && phonesOnWiFi.contains($0.serial) }
+        var ready = dedupe(found.filter(\.isReady))
+        let forgotten = forgottenPhones
+        if !forgotten.isEmpty {
+            if presentation == .setup {
+                // Setting a phone up again un-forgets it.
+                let back = Set(ready.map { hardwareSerial(of: $0) }).intersection(forgotten)
+                if !back.isEmpty { forgottenPhones = forgotten.subtracting(back) }
+            } else {
+                ready.removeAll { forgotten.contains(hardwareSerial(of: $0)) }
+            }
+        }
+        learnSerials(of: ready)
+
+        if ready.isEmpty, !found.contains(where: \.isUnauthorized), presentation == .phone,
+           Date().timeIntervalSince(searchStartedAt) > 7 {
+            // Like iPhone Mirroring: after a short search, explain what's needed.
+            presentation = .unavailable("")
+        } else if !ready.isEmpty, case .unavailable = presentation, autoConnect {
+            presentation = .phone
+        }
 
         if let wanted = pendingWirelessSerial, let device = ready.first(where: { $0.serial == wanted }) {
             pendingWirelessSerial = nil
@@ -195,6 +301,66 @@ final class AppModel: NSObject, ObservableObject {
         } else if state != .searching {
             state = .searching
         }
+    }
+
+    /// One phone can appear several times (USB, Wi-Fi 5555, Wireless debugging). Keep one entry
+    /// per phone, preferring Wireless debugging, then Wi-Fi, then USB.
+    private func dedupe(_ ready: [ADBDevice]) -> [ADBDevice] {
+        func rank(_ d: ADBDevice) -> Int {
+            d.serial.contains("._adb-tls-connect") ? 0 : (d.isWireless ? 1 : 2)
+        }
+        var best: [String: ADBDevice] = [:]
+        var order: [String] = []
+        for d in ready {
+            let id = hardwareSerial(of: d)
+            if let current = best[id] {
+                if rank(d) < rank(current) { best[id] = d }
+            } else {
+                best[id] = d
+                order.append(id)
+            }
+        }
+        return order.compactMap { best[$0] }
+    }
+
+    private func hardwareSerial(of d: ADBDevice) -> String {
+        if d.serial.hasPrefix("adb-") {
+            let name = d.serial.components(separatedBy: "._adb").first ?? d.serial
+            if let hw = ADB.MDNSService(name: name, type: "", address: "").hardwareSerial { return hw }
+        }
+        if let hw = wirelessMap[d.serial] { return hw }
+        return d.serial
+    }
+
+    private var serialLookups = Set<String>()
+
+    /// For Wi-Fi devices we don't know yet, ask for the hardware serial (for de-duplication).
+    private func learnSerials(of ready: [ADBDevice]) {
+        for d in ready where d.isWireless && !d.serial.hasPrefix("adb-")
+            && wirelessMap[d.serial] == nil && !serialLookups.contains(d.serial) {
+            serialLookups.insert(d.serial)
+            work.async { [weak self] in
+                guard let hw = (try? ADB.shared.run(["shell", "getprop", "ro.serialno"], serial: d.serial, timeout: 5))?.trimmed,
+                      !hw.isEmpty else { return }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    var map = self.wirelessMap
+                    map[d.serial] = hw
+                    self.wirelessMap = map
+                }
+            }
+        }
+    }
+
+    func openAppOnPhone(_ pkg: String) {
+        guard let serial = session?.device.serial else { return }
+        work.async {
+            _ = try? ADB.shared.run(["shell", "monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"],
+                                    serial: serial, timeout: 8)
+        }
+        presentation = .phone
+        windowController.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     // MARK: - Sessions
@@ -260,19 +426,87 @@ final class AppModel: NSObject, ObservableObject {
         newSession.start()
     }
 
+    /// Ends mirroring. The phone stays paired: "Reconnect" (or the next launch) connects again.
     func disconnect() {
         guard let s = session else { return }
+        let name = windowController.window?.title ?? s.device.displayName
+        lastDevice = s.device
         s.stop()
         endSession(s)
         autoConnect = false
         state = .searching
-        poll()
+        presentation = .disconnected(name)
+    }
+
+    func reconnect() {
+        presentation = .phone
+        onShowPhone?()
+        if let device = lastDevice, devices.contains(where: { $0.serial == device.serial && $0.isReady }) {
+            connect(device)
+        } else {
+            retry()
+        }
+    }
+
+    /// Disconnects and forgets the phone: drops its saved Wi-Fi addresses, turns off its wireless
+    /// debugging / Wi-Fi adb, and stops auto-connecting to it until it's set up again.
+    func forgetPhone() {
+        guard let device = session?.device ?? lastDevice else { return }
+        let alert = NSAlert()
+        alert.messageText = "Disconnect permanently from \(device.displayName)?"
+        alert.informativeText = "AirDoxx will forget this phone and turn off its wireless connection. To use it again, set it up again with a cable or by scanning the pairing QR code."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Forget Phone")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let hw = hardwareSerial(of: device)
+        if let s = session { s.stop(); endSession(s) }
+        var forgotten = forgottenPhones
+        forgotten.insert(hw)
+        forgottenPhones = forgotten
+
+        var map = wirelessMap
+        let addresses = Set(map.filter { $0.value == hw }.map(\.key)).union(device.isWireless ? [device.serial] : [])
+        for key in addresses { map.removeValue(forKey: key) }
+        wirelessMap = map
+        if let last = lastWirelessAddress, addresses.contains(last) { lastWirelessAddress = nil }
+        let liveSerials = devices.filter { hardwareSerial(of: $0) == hw && $0.isReady }.map(\.serial)
+
+        work.async {
+            let adb = ADB.shared
+            if let any = liveSerials.first {
+                _ = try? adb.run(["shell", "settings", "put", "global", "adb_wifi_enabled", "0"], serial: any, timeout: 5)
+                if let wifi = liveSerials.first(where: { $0.contains(":") }) {
+                    _ = try? adb.run(["usb"], serial: wifi, timeout: 5)   // leave Wi-Fi adb (port 5555) mode
+                }
+            }
+            for address in addresses.union(liveSerials.filter { $0.contains(":") || $0.contains("._adb") }) {
+                _ = try? adb.run(["disconnect", address], timeout: 5)
+            }
+        }
+        lastDevice = nil
+        autoConnect = false
+        setupComplete = false
+        state = .searching
+        presentation = .setup
+    }
+
+    private var lastDevice: ADBDevice?
+
+    /// Hardware serials the user asked to forget. Cleared when they set the phone up again.
+    private var forgottenPhones: Set<String> {
+        get { Set(defaults.stringArray(forKey: "forgottenPhones") ?? []) }
+        set { defaults.set(Array(newValue), forKey: "forgottenPhones") }
     }
 
     private func endSession(_ s: MirrorSession) {
         guard session === s else { return }
         session = nil
         nowPlaying.deactivate()
+        notifications.stop()
+        clipboardTimer?.invalidate()
+        clipboardTimer = nil
         secureMonitor?.stop()
         secureMonitor = nil
         phoneLocked = false
@@ -280,7 +514,7 @@ final class AppModel: NSObject, ObservableObject {
         windowController.showProtectedNotice(false)
         windowController.screenView.session = nil
         windowController.showMirroring(false)
-        windowController.window?.title = "AirDox"
+        windowController.window?.title = "AirDoxx"
     }
 
     private func reconnectIfMirroring() {
@@ -320,6 +554,24 @@ final class AppModel: NSObject, ObservableObject {
     }
 
     /// Push the Mac clipboard to the phone (without pasting) when the user comes back to the app.
+    /// Universal clipboard: anything copied on the Mac is sent to the phone (phone -> Mac is pushed
+    /// by the phone itself whenever its clipboard changes).
+    var universalClipboard: Bool {
+        get { defaults.object(forKey: "universalClipboard") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "universalClipboard") }
+    }
+
+    private var clipboardTimer: Timer?
+
+    private func startClipboardSync() {
+        clipboardTimer?.invalidate()
+        lastPasteboardChange = NSPasteboard.general.changeCount
+        clipboardTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
+            guard let self, self.universalClipboard else { return }
+            self.syncClipboardToPhone()
+        }
+    }
+
     func syncClipboardToPhone() {
         let pb = NSPasteboard.general
         guard let s = session, pb.changeCount != lastPasteboardChange,
@@ -500,6 +752,7 @@ final class AppModel: NSObject, ObservableObject {
                 } else {
                     self.state = .failed("Your Android phone is not available",
                                          "Lost the Wi-Fi connection. Make sure the phone is unlocked once and on the same Wi-Fi as this Mac, or plug it in with USB.\n\n\(error)")
+                    if self.presentation != .setup { self.presentation = .unavailable("") }
                 }
             }
         }
@@ -537,9 +790,7 @@ final class AppModel: NSObject, ObservableObject {
     }
 
     func showUSBDebuggingHelp() {
-        if let url = URL(string: "https://developer.android.com/studio/debug/dev-options#enable") {
-            NSWorkspace.shared.open(url)
-        }
+        NSWorkspace.shared.open(AirDoxxLinks.setupGuide)
     }
 }
 
@@ -549,8 +800,15 @@ extension AppModel: MirrorSessionDelegate {
     func sessionDidStart(_ session: MirrorSession, deviceName: String) {
         guard session === self.session else { return }
         let name = deviceName.isEmpty ? session.device.displayName : deviceName
+        lastDevice = session.device
         state = .mirroring(name)
         reconnectAttempts = 0
+        if presentation != .phone {
+            if presentation == .setup { setupComplete = true }
+            presentation = .phone
+        }
+        notifications.start(serial: session.device.serial)
+        startClipboardSync()
         startSecureMonitor(for: session)
         nowPlaying.onKey = { [weak self] code in self?.session?.pressKey(code) }
         nowPlaying.activate(title: name)
@@ -587,6 +845,7 @@ extension AppModel: MirrorSessionDelegate {
             ? "Mirroring component version mismatch"
             : "Your Android phone is not available"
         state = .failed(headline, detail)
+        if presentation != .setup { presentation = .unavailable(detail) }
     }
 
     func session(_ session: MirrorSession, didReceiveClipboard text: String) {
@@ -595,6 +854,7 @@ extension AppModel: MirrorSessionDelegate {
         pb.clearContents()
         pb.setString(text, forType: .string)
         lastPasteboardChange = pb.changeCount
+        if universalClipboard { windowController.showToast("Copied from phone") }
     }
 }
 

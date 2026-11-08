@@ -3,3 +3,4 @@ build/
 *.app
 .signing/
 .DS_Store
+.claude/

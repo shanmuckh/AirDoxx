@@ -1,80 +1,63 @@
-# AirDox
+<p align="center"><img src="docs/assets/icon.png" width="128" alt="AirDoxx icon"></p>
 
-AirDox is a native macOS app (Swift, AppKit + SwiftUI) that mirrors and controls an Android phone. It is modelled on Apple's iPhone Mirroring.
+# AirDoxx
+
+AirDoxx is a native macOS app that mirrors and controls an Android phone, modelled on Apple's iPhone Mirroring. It shows the phone's screen, plays its sound, forwards its notifications and shares its clipboard. You control the phone with your Mac's keyboard and trackpad, and it works wirelessly after a one-time setup.
+
+**Website and setup guide:** https://shanmuckh.github.io/AirDox/
 
 ## Features
 
 ### Window and display
-- A phone-shaped window with rounded corners. Hover over it to show a toolbar:
-  - traffic lights
-  - **Screens**: show the phone on both screens, or on the Mac only with the phone's own display off (⇧⌘P)
-  - **Rotate**: switch between portrait and landscape (⌘R). The phone turns 90° in place instead of the window reshaping.
+- Phone-shaped window with a hover toolbar:
+  - **Disconnect** (⏻): disconnect, or disconnect permanently to make AirDoxx forget the phone
+  - **Screens**: show on both screens, or on the Mac only with the phone's display off
+  - **Rotate**: the phone turns 90° in place
   - **Back**, **Home**, **App Switcher**
-- Video is hardware-decoded H.264 at up to 60 fps, using VideoToolbox through `AVSampleBufferDisplayLayer`.
-- **Phone audio plays on the Mac** (Android 11+).
+- 60 fps hardware-decoded video, and phone audio on the Mac (Android 11+).
 
-### Wireless by default
-- The first time the phone is plugged in over USB, AirDox switches it to Wi-Fi and mirrors over Wi-Fi, so you can unplug the cable.
-- Later launches reconnect without a cable, and dropped connections are reconnected quietly.
-- After the phone **reboots**, plug it in once more, or pair under Connection › Connect Wirelessly…
+### Connection
+- **Pair once, then wireless:**
+  - Plug in once, or scan a QR code from *Wireless debugging › Pair device with QR code*.
+  - After that, AirDoxx finds the phone on your Wi-Fi by itself, with no pairing again.
 
-### Input
-- Click or drag to tap and swipe. Double-tap and long-press work.
-- Scroll with a trackpad or mouse wheel.
-- Two-finger trackpad swipes become finger drags:
-  - Start near the left or right edge to go **Back**.
-  - Swipe up from the bottom to go **Home**. Swipe up and hold for the app switcher.
-  - Swipe down from the top for notifications.
-- Pinch on the trackpad to zoom.
-- Right-click is Back, middle-click is Home.
-- Type with the full keyboard. Esc is Back.
+### Phone to Mac
+- **Notifications:** phone notifications appear as Mac notifications. Click one to open that app on the phone.
+- **Universal Clipboard:** copy on one device and paste on the other, automatically, in both directions.
 
-### Mac keys on the phone
-These keys go to the phone while the AirDox window is in front:
+### Input and Mac keys
+- **Gestures:**
+  - Click, double-tap, long-press and drag.
+  - Two-finger swipes, with Back and Home from the edges.
+  - Pinch, and the full keyboard.
+- **Mac keys go to the phone:**
+  - volume, brightness and media keys
+  - F3 for the app switcher
+  - F4 for search: the open app's search box if it has one, otherwise the phone's search
+  - F5 for the voice assistant
+  - ⌥⌘D for Do Not Disturb
 
-| Mac key | On the phone |
-|---|---|
-| Volume up/down, mute | Phone volume and mute |
-| Brightness up/down | Phone brightness |
-| F7 / F8 / F9 | Previous / Play-Pause / Next |
-| F3 | App switcher |
-| F4 | Search: the open app's search box if it has one, otherwise the phone's search |
-| F5 | Voice assistant |
-| ⌥⌘D | Do Not Disturb on/off |
+### Smart screen handling
+- When the phone locks, its own screen turns on for the fingerprint sensor, and you can also type the PIN from the Mac.
+- Protected screens (GPay, banking) show a "Continue on your phone" notice.
 
-This needs a one-time permission in System Settings › Privacy & Security › Accessibility ("Device Control and Data Access" on newer macOS).
+### Extras
+- Drag a file onto the phone to save it to Downloads, or drag an APK to install it.
+- ⇧⌘S saves a screenshot to the Desktop.
 
-### Lock screen
-When the phone locks, its own screen turns on so you can unlock it with its fingerprint sensor. You can also type the PIN from the Mac. After unlocking, the phone screen follows the Screens setting again.
-
-### Protected screens
-When an app shows a secure screen (GPay, banking, PIN entry), AirDox shows a "Continue on your phone" notice and turns the phone's screen on. Android hides secure screens from all screen capture by design.
-
-### Clipboard, files and other shortcuts
-- **Clipboard:** ⌘C / ⌘X copy from the phone to the Mac, and ⌘V pastes from the Mac to the phone.
-- **Files:** drag a file onto the phone to save it to Downloads. Drag an `.apk` to install it.
-- **Shortcuts:**
-
-  | Shortcut | Action |
-  |---|---|
-  | ⌘1 | Home |
-  | ⌘2 | App Switcher |
-  | ⌘3 | Notifications |
-  | ⌘4 | Quick Settings |
-  | ⌘[ | Back |
-  | ⌘L | Lock |
-  | ⇧⌘S | Screenshot to Desktop |
-  | ⌘+ / ⌘0 / ⌘− | Window size |
+### Mac-style UI
+- An iPhone-Mirroring-style welcome and setup flow with frosted-glass styling.
+- The Mac permissions are requested from inside the app.
 
 ## Phone setup (one time)
 1. Settings › About phone › tap **Build number** 7 times.
 2. Settings › Developer options › turn on **USB debugging**.
    - On Xiaomi / HyperOS, also turn on **USB debugging (Security settings)**.
-3. Plug the phone in and tap **Allow** on the prompt. Tick **Always allow**.
+3. Plug the phone in and tap **Allow**, or use **Wireless debugging › Pair device with QR code** (Android 11+).
 
-Developer options are required. AirDox controls the phone through Android's debugging interface (adb).
+Developer options are required. AirDoxx controls the phone through Android's debugging interface (adb), and nothing is installed on the phone.
 
-## Build
+## Build and install
 ```bash
 brew install --cask android-platform-tools
 ```
@@ -82,25 +65,30 @@ brew install --cask android-platform-tools
 brew install scrcpy
 ```
 ```bash
-./scripts/build_app.sh
+./scripts/build_app.sh --install
 ```
-This builds `build/AirDox.app`. The script copies `adb` and the scrcpy server into the app bundle.
+This builds AirDoxx and installs it in **/Applications**, so it shows up in Finder, Launchpad and Spotlight. The script copies `adb` and the scrcpy server into the app bundle.
 
-The app is signed with a self-signed identity kept in `.signing/`, a project-local keychain. This folder is git-ignored and is not your login keychain. Because the identity stays the same, the Accessibility permission survives rebuilds.
+The app is signed with a self-signed identity kept in `.signing/`, a project-local keychain. This folder is git-ignored. Because the identity stays the same, the Mac permissions survive rebuilds.
+
+## Website
+The website lives in `docs/` and is plain HTML, CSS and JavaScript. To publish it with GitHub Pages:
+1. Open **Settings › Pages** in the repository.
+2. Set **Source** to *Deploy from a branch*.
+3. Set **Branch** to `main` and the folder to `/docs`.
 
 ## Known limitations
-- **Banking and payment apps:** their protected screens can't be mirrored. Finish those steps on the phone.
-- **Resolution:** some phone encoders can't stream at full resolution. The server then drops to a lower one automatically.
-- **Screen staying on:** some ROMs, such as HyperOS, turn the phone screen back on when input arrives. AirDox keeps switching it off again while in "Mac only" mode.
+- **Banking and payment apps:** their protected screens can't be mirrored, because Android blocks screen capture of them by design.
+- **After a phone reboot:** turn Wireless debugging back on (or plug in once). Android switches it off when the phone restarts.
 
 ## How it works
-AirDox copies the open-source [scrcpy](https://github.com/Genymobile/scrcpy) server (Apache-2.0) to the phone and starts it there. It then talks to the server over an `adb forward` tunnel using scrcpy's v5.0.1 wire protocol.
+AirDoxx copies the open-source [scrcpy](https://github.com/Genymobile/scrcpy) server (Apache-2.0) to the phone and starts it there. It then talks to the server over an `adb forward` tunnel using scrcpy's v5.0.1 wire protocol.
 
-The protocol client, video pipeline, audio, input and UI are all written in Swift. AirDox does not run the scrcpy desktop program.
+The protocol client, video and audio pipeline, input, notification bridge, clipboard and UI are all written in Swift.
 
 Code layout:
-- `Sources/AirDox/Protocol`: the wire format
-- `Device`: adb, the mirroring session, search, and secure-screen detection
+- `Sources/AirDoxx/Protocol`: the wire format
+- `Device`: adb, sessions, pairing, notifications, search and secure-screen detection
 - `Media`: video and audio
 - `Input`: Mac keys and Now Playing
 - `UI`: windows and views

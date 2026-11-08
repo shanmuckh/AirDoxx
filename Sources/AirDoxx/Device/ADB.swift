@@ -107,6 +107,31 @@ final class ADB {
         return result
     }
 
+    struct MDNSService {
+        let name: String     // e.g. "adb-a48f29af-Xy12Ab" or the QR pairing name
+        let type: String     // "_adb-tls-connect._tcp" / "_adb-tls-pairing._tcp"
+        let address: String  // "ip:port"
+
+        /// Hardware serial embedded in adb's service name ("adb-<serial>-<suffix>").
+        var hardwareSerial: String? {
+            guard name.hasPrefix("adb-") else { return nil }
+            let rest = name.dropFirst(4)
+            guard let dash = rest.lastIndex(of: "-") else { return nil }
+            return String(rest[..<dash])
+        }
+    }
+
+    /// Phones advertising Wireless debugging (Android 11+) on the local network.
+    func mdnsServices() -> [MDNSService] {
+        guard let out = try? run(["mdns", "services"], timeout: 5) else { return [] }
+        return out.split(separator: "\n").compactMap { line in
+            let parts = line.split(whereSeparator: { $0 == "\t" || $0 == " " }).map(String.init)
+            guard parts.count >= 3, parts[1].hasPrefix("_adb-tls") else { return nil }
+            return MDNSService(name: parts[0], type: parts[1].trimmingCharacters(in: CharacterSet(charactersIn: ".")),
+                               address: parts[2])
+        }
+    }
+
     /// Returns the phone's Wi-Fi IPv4 address, if any.
     func wifiAddress(serial: String) -> String? {
         guard let output = try? run(["shell", "ip", "route"], serial: serial, timeout: 10) else { return nil }

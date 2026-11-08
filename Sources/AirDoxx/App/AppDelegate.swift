@@ -5,7 +5,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     let model = AppModel()
     var windowController: MirrorWindowController!
     let keyInterceptor = MacKeyInterceptor()
-    private var mirroringObserver: Any?
+    var hub: HubWindowController!
+    private var presentationObserver: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         windowController = MirrorWindowController(model: model)
@@ -13,13 +14,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         NSApp.mainMenu = buildMenu()
         windowController.onToggleScreenMode = { [weak self] in self?.model.toggleScreenMode() }
         windowController.onRotate = { [weak self] in self?.model.rotatePhone() }
+        windowController.onDisconnect = { [weak self] in self?.model.disconnect() }
+        windowController.onForget = { [weak self] in self?.model.forgetPhone() }
         windowController.updateScreenModeButton(macOnly: model.turnScreenOff)
         windowController.showMirroring(false)
-        windowController.showWindow(nil)
-        windowController.window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        hub = HubWindowController(app: model)
+        presentationObserver = model.$presentation.removeDuplicates().sink { [weak self] p in
+            DispatchQueue.main.async { self?.present(p) }
+        }
+        model.onShowPhone = { [weak self] in self?.present(.phone) }
         model.start()
         setUpMacKeys()
+
+        // Preview aid: AM_PAGE=welcome|permissions|phoneSetup|connect|unavailable opens that page.
+        if let raw = ProcessInfo.processInfo.environment["AM_PAGE"] {
+            let pages: [String: HubModel.Page] = ["welcome": .welcome, "permissions": .permissions,
+                                                  "phoneSetup": .phoneSetup, "connect": .connect,
+                                                  "unavailable": .unavailable]
+            if let page = pages[raw] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.windowController.window?.orderOut(nil)
+                    self?.hub.show(page: page)
+                }
+            }
+        }
 
         #if DEBUG
         NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { event in
@@ -32,10 +50,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         #endif
 
-        // Debug aid: AM_SNAPSHOT=/path/out.png renders the window to a PNG after launch.
+        // Debug aid: AM_SNAPSHOT=/path/out.png renders the front window to a PNG after launch
+        // (AM_SNAPSHOT_DELAY seconds, default 2.5).
         if let path = ProcessInfo.processInfo.environment["AM_SNAPSHOT"] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
-                guard let view = self?.windowController.window?.contentView,
+            let delay = Double(ProcessInfo.processInfo.environment["AM_SNAPSHOT_DELAY"] ?? "") ?? 2.5
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                let front = self?.hub.window?.isVisible == true ? self?.hub.window : self?.windowController.window
+                guard let view = front?.contentView,
                       let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
                 view.cacheDisplay(in: view.bounds, to: rep)
                 try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
@@ -56,6 +77,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         model.syncClipboardToPhone()
     }
 
+    // MARK: - Windows
+
+    /// Shows the window for the current step, like iPhone Mirroring: setup flow, the phone itself,
+    /// or the wide "Unable to Connect" window.
+    private func present(_ p: Presentation) {
+        switch p {
+        case .setup:
+            windowController.window?.orderOut(nil)
+            hub.show(page: model.setupComplete ? .connect : .welcome)
+        case .phone:
+            hub.hide()
+            windowController.showWindow(nil)
+            windowController.window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        case .unavailable(let detail):
+            windowController.window?.orderOut(nil)
+            hub.show(page: .unavailable, detail: detail)
+        case .disconnected(let name):
+            windowController.window?.orderOut(nil)
+            hub.show(page: .disconnected, detail: name)
+        }
+    }
+
+    @objc private func setUpPhone() { model.beginSetup() }
+
     // MARK: - Mac special keys
 
     private func setUpMacKeys() {
@@ -66,35 +112,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             return true
         }
         keyInterceptor.start()
-        // Ask for the permission the first time mirroring starts (once; the menu can ask again).
-        mirroringObserver = model.$state.sink { [weak self] state in
-            guard case .mirroring = state else { return }
-            DispatchQueue.main.async { self?.offerMacKeysPermissionOnce() }
-        }
     }
 
-    private func offerMacKeysPermissionOnce() {
-        let defaults = UserDefaults.standard
-        guard !MacKeyInterceptor.hasPermission, !defaults.bool(forKey: "askedMacKeysPermission") else { return }
-        defaults.set(true, forKey: "askedMacKeysPermission")
-        requestMacKeys()
-    }
-
+    /// Opens AirDoxx's own permissions page (no hunting through System Settings).
     @objc private func requestMacKeys() {
-        if MacKeyInterceptor.hasPermission {
-            keyInterceptor.start()
-            windowController.showToast("Mac function keys control the phone")
-            return
-        }
-        let alert = NSAlert()
-        alert.messageText = "Use your Mac's function keys on the phone?"
-        alert.informativeText = "To send volume, brightness, media and Search (F4) keys to your phone instead of the Mac while this window is in front, allow AirDox in System Settings › Privacy & Security › Accessibility.\n\nmacOS handles these keys before any app sees them, so this permission is required. They only go to the phone while the mirroring window is active."
-        alert.addButton(withTitle: "Open Settings")
-        alert.addButton(withTitle: "Not Now")
-        if alert.runModal() == .alertFirstButtonReturn {
-            MacKeyInterceptor.requestPermission()
-            keyInterceptor.start() // keeps checking until permission is granted
-        }
+        keyInterceptor.start()
+        windowController.window?.orderOut(nil)
+        hub.show(page: .permissions)
+    }
+
+    @objc private func showWelcome() {
+        windowController.window?.orderOut(nil)
+        hub.show(page: .welcome)
     }
 
     // MARK: - Menu
@@ -104,21 +133,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         // App
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About AirDox", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: "About AirDoxx", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide AirDox", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Hide AirDoxx", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Quit AirDox", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        main.addItem(submenu(appMenu, title: "AirDox"))
+        appMenu.addItem(withTitle: "Quit AirDoxx", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        main.addItem(submenu(appMenu, title: "AirDoxx"))
 
         // File / Connection
         let file = NSMenu(title: "Connection")
         file.addItem(item("Connect Over Wi-Fi Automatically", #selector(toggleAutoWireless), ""))
-        file.addItem(item("Connect Wirelessly…", #selector(showWireless), "k"))
+        file.addItem(item("Set Up or Pair a Phone…", #selector(setUpPhone), "n"))
+        file.addItem(item("Pair with Code…", #selector(showWireless), "k"))
         file.addItem(item("Disconnect", #selector(disconnect), "d", [.command, .shift]))
+        file.addItem(item("Disconnect Permanently…", #selector(forgetPhone), ""))
+        file.addItem(item("Universal Clipboard", #selector(toggleClipboard), ""))
         file.addItem(.separator())
         file.addItem(item("Close Window", #selector(NSWindow.performClose(_:)), "w", target: nil))
         main.addItem(submenu(file, title: "Connection"))
@@ -167,7 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         phone.addItem(.separator())
         phone.addItem(item("Show on Mac Only (Phone Screen Off)", #selector(toggleScreenOffSetting), "p", [.command, .shift]))
         phone.addItem(item("Play Phone Audio on Mac", #selector(toggleAudio), ""))
-        phone.addItem(item("Use Mac Function Keys on Phone…", #selector(requestMacKeys), ""))
+        phone.addItem(item("Permissions…", #selector(requestMacKeys), ""))
         main.addItem(submenu(phone, title: "Phone"))
 
         // Window
@@ -179,7 +211,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         // Help
         let help = NSMenu(title: "Help")
-        help.addItem(item("How to Turn On USB Debugging", #selector(usbHelp), ""))
+        help.addItem(item("Welcome to AirDoxx…", #selector(showWelcome), ""))
+        help.addItem(item("AirDoxx Website & Setup Guide", #selector(usbHelp), ""))
         main.addItem(submenu(help, title: "Help"))
 
         return main
@@ -208,16 +241,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         case #selector(toggleScreenOffSetting):
             menuItem.state = model.turnScreenOff ? .on : .off
             return true
+        case #selector(toggleClipboard):
+            menuItem.state = model.universalClipboard ? .on : .off
+            return true
         case #selector(toggleAutoWireless):
             menuItem.state = model.autoWireless ? .on : .off
             return true
         case #selector(requestMacKeys):
-            menuItem.state = keyInterceptor.isActive ? .on : .off
             return true
         case #selector(toggleAudio):
             menuItem.state = model.audioEnabled ? .on : .off
             return true
-        case #selector(showWireless), #selector(usbHelp), #selector(larger), #selector(smaller), #selector(actualSize):
+        case #selector(showWireless), #selector(usbHelp), #selector(setUpPhone), #selector(showWelcome), #selector(larger), #selector(smaller), #selector(actualSize):
             return true
         default:
             return model.isMirroring
@@ -228,6 +263,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc private func showWireless() { model.showWirelessSheet() }
     @objc private func disconnect() { model.disconnect() }
+    @objc private func forgetPhone() { model.forgetPhone() }
+    @objc private func toggleClipboard() { model.universalClipboard.toggle() }
     @objc private func usbHelp() { model.showUSBDebuggingHelp() }
 
     @objc private func larger() { windowController.larger() }
