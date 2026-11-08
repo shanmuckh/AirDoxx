@@ -21,11 +21,12 @@
       <a href="#features">Features</a>
       <a href="#clipboard">Clipboard</a>
       <a href="#demo">Demo</a>
+      <a href="#download">Download</a>
       <a href="#setup">Setup</a>
       <a href="#keys">Shortcuts</a>
       <a href="#faq">FAQ</a>
     </nav>
-    <a class="btn btn-small" href="https://github.com/shanmuckh/AirDox">GitHub</a>
+    <a class="btn btn-small btn-primary" href="https://github.com/shanmuckh/AirDox/releases/latest/download/AirDoxx.dmg">Download</a>
   </header>
 
   <main id="top">
@@ -37,10 +38,11 @@
           <span class="line"><span class="word">Your</span> <span class="word grad">Android,</span></span>
           <span class="line"><span class="word">on</span> <span class="word">your</span> <span class="word grad">Mac.</span></span>
         </h1>
+        <p class="version-chip reveal"><span class="dot"></span> Version 1.0 · Free · macOS 14 or later</p>
         <p class="lede reveal">See your phone's screen, hear its sound, get its notifications, and control it with your keyboard and trackpad. Wireless after one setup. No app needed on the phone.</p>
         <div class="cta reveal">
-          <a class="btn btn-primary magnetic" href="#setup"><span>Set up in 3 minutes</span></a>
-          <a class="btn btn-ghost magnetic" href="#demo"><span>Try the demo ↓</span></a>
+          <a class="btn btn-primary magnetic" href="https://github.com/shanmuckh/AirDox/releases/latest/download/AirDoxx.dmg"><span> Download for Mac</span></a>
+          <a class="btn btn-ghost magnetic" href="#setup"><span>Set up in 3 minutes</span></a>
         </div>
       </div>
 
@@ -175,6 +177,23 @@
       </div>
     </section>
 
+    <!-- ============ DOWNLOAD ============ -->
+    <section class="download" id="download">
+      <div class="dl-card reveal">
+        <img class="dl-icon" src="assets/icon.png" alt="" width="132" height="132">
+        <h2>Get AirDoxx 1.0</h2>
+        <p class="sub">Free · Universal (Apple silicon &amp; Intel) · macOS 14 Sonoma or later</p>
+        <a class="btn btn-primary btn-big magnetic" href="https://github.com/shanmuckh/AirDox/releases/latest/download/AirDoxx.dmg"><span>⬇ Download AirDoxx.dmg</span></a>
+        <p class="fine"><a href="https://github.com/shanmuckh/AirDox/releases/latest">Release notes</a> · <a href="https://github.com/shanmuckh/AirDox">Source code</a></p>
+        <ol class="dl-steps">
+          <li><b>Open</b> the downloaded <code>AirDoxx.dmg</code> and drag <b>AirDoxx</b> into <b>Applications</b>.</li>
+          <li><b>First launch:</b> AirDoxx isn't notarized by Apple yet, so macOS asks once. Open AirDoxx, click <b>Done</b>, then go to <b>System Settings › Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</li>
+          <li>Follow the welcome screen – it asks for the Mac permissions and helps you connect your phone.</li>
+        </ol>
+        <p class="fine">Needs an Android phone with Android 8+ (sound on the Mac needs Android 11+, QR pairing needs Android 11+). Nothing to install on the phone.</p>
+      </div>
+    </section>
+
     <!-- ============ SETUP ============ -->
     <section class="setup" id="setup">
       <h2 class="section-title reveal">Set up in three minutes.</h2>
@@ -191,12 +210,12 @@
         </li>
         <li class="step reveal">
           <div class="step-art"><img class="step-icon" src="assets/icon.png" alt="" width="120" height="120"></div>
-          <div class="step-copy"><span class="num">3</span><h3>Install and open AirDoxx</h3><p>Build it from source on your Mac (it lands in <b>Applications</b>), then open it:</p>
-            <pre><code>brew install --cask android-platform-tools
+          <div class="step-copy"><span class="num">3</span><h3>Install and open AirDoxx</h3><p><a href="https://github.com/shanmuckh/AirDox/releases/latest/download/AirDoxx.dmg">Download AirDoxx.dmg</a>, drag it into <b>Applications</b> and open it (first time: <b>System Settings › Privacy &amp; Security › Open Anyway</b>). Everything it needs is built in.</p>
+            <p>The welcome screen asks for the two Mac permissions right there – <b>Keyboard &amp; Control Keys</b> and <b>Notifications</b>. No digging through System Settings.</p>
+            <details class="dev"><summary>Prefer to build from source?</summary><pre><code>brew install --cask android-platform-tools
 brew install scrcpy
 git clone https://github.com/shanmuckh/AirDox.git
-cd AirDox &amp;&amp; ./scripts/build_app.sh --install</code></pre>
-            <p>The welcome screen asks for the two Mac permissions right there – <b>Keyboard &amp; Control Keys</b> and <b>Notifications</b>. No digging through System Settings.</p></div>
+cd AirDox &amp;&amp; ./scripts/build_app.sh --install</code></pre></details></div>
         </li>
         <li class="step reveal">
           <div class="step-art"><div class="connect-art"><div class="cable"></div><div class="qr-art"></div></div></div>
@@ -232,6 +251,7 @@ cd AirDox &amp;&amp; ./scripts/build_app.sh --install</code></pre>
       <details class="reveal"><summary>Why does it need Developer options?</summary><p>Capturing the screen and simulating touches from a computer is only allowed through Android's debugging interface. It's the same mechanism Android Studio uses.</p></details>
       <details class="reveal"><summary>Will I have to pair again?</summary><p>No. Once paired, AirDoxx reconnects by itself on the same Wi-Fi. If your phone restarts and Wireless debugging is off, turn it on (or plug in once) and AirDoxx picks it up.</p></details>
       <details class="reveal"><summary>Why is GPay or my banking app black?</summary><p>Payment and banking apps mark their screens as secure, and Android hides them from every kind of screen capture on purpose. AirDoxx tells you and switches the phone screen on so you can finish there.</p></details>
+      <details class="reveal"><summary>macOS says it can't check AirDoxx for malicious software.</summary><p>That's because AirDoxx isn't notarized by Apple yet. Open it once, click <b>Done</b>, then go to <b>System Settings › Privacy &amp; Security</b> and click <b>Open Anyway</b>. You only do this once. The full source is on GitHub.</p></details>
       <details class="reveal"><summary>Is it private?</summary><p>Everything stays between your phone and your Mac on your own network. Nothing is uploaded anywhere.</p></details>
     </section>
   </main>

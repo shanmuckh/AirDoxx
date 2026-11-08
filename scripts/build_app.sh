@@ -5,12 +5,21 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="AirDoxx"
+APP_VERSION="1.0.0"
+BUILD_NUMBER="1"
+MODE="${1:-}"   # "", "--install" or "--release"
 APP="build/$APP_NAME.app"
 CONTENTS="$APP/Contents"
 
 echo "==> Compiling (release)"
-swift build -c release
-BIN="$(swift build -c release --show-bin-path)/AirDoxx"
+if [[ "$MODE" == "--release" ]]; then
+    # Universal binary: Apple silicon + Intel.
+    swift build -c release --arch arm64 --arch x86_64
+    BIN="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/AirDoxx"
+else
+    swift build -c release
+    BIN="$(swift build -c release --show-bin-path)/AirDoxx"
+fi
 
 echo "==> Assembling $APP"
 rm -rf "${APP:?}"
@@ -27,8 +36,8 @@ cat > "$CONTENTS/Info.plist" <<PLIST
     <key>CFBundleIdentifier</key><string>com.shanmuckh.airdoxx</string>
     <key>CFBundleExecutable</key><string>AirDoxx</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleShortVersionString</key><string>$APP_VERSION</string>
+    <key>CFBundleVersion</key><string>$BUILD_NUMBER</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
@@ -74,6 +83,23 @@ if [[ -n "$ADB_BIN" ]]; then
 else
     echo "!!  adb not found: the app will ask for it at runtime (brew install --cask android-platform-tools)"
 fi
+
+# --- Third-party notices -------------------------------------------------------
+NOTICES="$CONTENTS/Resources/ThirdPartyNotices.txt"
+{
+    echo "AirDoxx bundles the following third-party components."
+    echo
+    echo "== scrcpy server (https://github.com/Genymobile/scrcpy) =="
+    SCRCPY_LICENSE="$(ls /opt/homebrew/Cellar/scrcpy/*/LICENSE /usr/local/Cellar/scrcpy/*/LICENSE 2>/dev/null | head -1 || true)"
+    if [[ -n "$SCRCPY_LICENSE" ]]; then cat "$SCRCPY_LICENSE"; else echo "Licensed under the Apache License, Version 2.0."; fi
+    echo
+    echo "== Android SDK Platform-Tools: adb (https://developer.android.com/tools/releases/platform-tools) =="
+    if [[ -n "${ADB_BIN:-}" && -f "$(dirname "$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$ADB_BIN")")/NOTICE.txt" ]]; then
+        cat "$(dirname "$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$ADB_BIN")")/NOTICE.txt"
+    else
+        echo "adb is part of the Android Open Source Project, licensed under the Apache License, Version 2.0."
+    fi
+} > "$NOTICES"
 
 # --- Signing ---------------------------------------------------------------------
 # macOS ties the Accessibility permission (needed for the Mac function keys) to the app's
@@ -134,4 +160,20 @@ if [[ "${1:-}" == "--install" ]]; then
     rm -rf "/Applications/${APP_NAME:?}.app"
     cp -R "$APP" "/Applications/"
     echo "==> Installed /Applications/$APP_NAME.app"
+fi
+
+# --- Release DMG ----------------------------------------------------------------
+# ./scripts/build_app.sh --release  builds a universal app and build/AirDoxx.dmg
+# (drag-to-Applications layout) ready to attach to a GitHub release.
+if [[ "$MODE" == "--release" ]]; then
+    STAGE="build/dmg-stage"
+    DMG="build/$APP_NAME.dmg"
+    rm -rf "${STAGE:?}" "${DMG:?}"
+    mkdir -p "$STAGE"
+    cp -R "$APP" "$STAGE/"
+    ln -s /Applications "$STAGE/Applications"
+    hdiutil create -volname "$APP_NAME $APP_VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+    rm -rf "${STAGE:?}"
+    shasum -a 256 "$DMG" | tee "$DMG.sha256"
+    echo "==> Release DMG: $DMG"
 fi

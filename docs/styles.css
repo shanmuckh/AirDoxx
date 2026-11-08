@@ -513,3 +513,23 @@ details p { color: var(--muted); margin: 0 0 16px; }
 .caret { display: inline-block; width: 2px; height: 14px; vertical-align: middle; background: var(--green); }
 @media (prefers-reduced-motion: no-preference) { .caret { animation: blink 1s steps(1) infinite; } }
 @keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- download ---------- */
+.version-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; font-size: 13px; color: var(--ink);
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); backdrop-filter: blur(10px); margin: 0 0 6px; }
+.version-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); }
+.download { padding: 120px clamp(16px, 5vw, 80px) 20px; }
+.dl-card {
+  position: relative; max-width: 760px; margin: 0 auto; padding: 56px clamp(20px, 5vw, 60px); text-align: center; border-radius: 36px;
+  background: radial-gradient(600px 300px at 50% 0%, rgba(61, 220, 132, 0.18), transparent 70%), rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 60px 120px -40px rgba(61, 220, 132, 0.35);
+}
+.dl-card h2 { font-size: clamp(34px, 4.5vw, 54px); margin: 18px 0 6px; letter-spacing: -0.03em; }
+.dl-card .sub { margin-bottom: 26px; }
+.dl-icon { border-radius: 30px; filter: drop-shadow(0 25px 40px rgba(61, 220, 132, 0.45)); }
+@media (prefers-reduced-motion: no-preference) { .dl-icon { animation: float 5s ease-in-out infinite; } }
+.btn-big { padding: 18px 34px; font-size: 18px; }
+.dl-steps { text-align: left; max-width: 560px; margin: 34px auto 10px; color: var(--muted); display: grid; gap: 10px; }
+.dev summary { font-size: 15px; color: var(--green); padding: 8px 0; }
+.dev { border: 0; }

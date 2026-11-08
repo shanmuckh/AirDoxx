@@ -6,6 +6,16 @@ AirDoxx is a native macOS app that mirrors and controls an Android phone, modell
 
 **Website and setup guide:** https://shanmuckh.github.io/AirDox/
 
+## Download
+
+**[⬇ Download AirDoxx 1.0 for Mac (DMG)](https://github.com/shanmuckh/AirDox/releases/latest/download/AirDoxx.dmg)**
+
+The app is universal (Apple silicon and Intel) and needs macOS 14 Sonoma or later.
+
+1. Open `AirDoxx.dmg` and drag **AirDoxx** into **Applications**.
+2. The first launch needs one extra step, because AirDoxx isn't notarized by Apple yet. Open it and click **Done** on the warning. Then go to **System Settings › Privacy & Security**, scroll down and click **Open Anyway**.
+3. Follow the welcome screen. It asks for the Mac permissions and helps you connect your phone.
+
 ## Features
 
 ### Window and display
@@ -57,7 +67,7 @@ AirDoxx is a native macOS app that mirrors and controls an Android phone, modell
 
 Developer options are required. AirDoxx controls the phone through Android's debugging interface (adb), and nothing is installed on the phone.
 
-## Build and install
+## Build from source
 ```bash
 brew install --cask android-platform-tools
 ```
@@ -68,6 +78,8 @@ brew install scrcpy
 ./scripts/build_app.sh --install
 ```
 This builds AirDoxx and installs it in **/Applications**, so it shows up in Finder, Launchpad and Spotlight. The script copies `adb` and the scrcpy server into the app bundle.
+
+To build the release DMG instead, run `./scripts/build_app.sh --release`. It produces a universal app, `build/AirDoxx.dmg` and a SHA-256 checksum.
 
 The app is signed with a self-signed identity kept in `.signing/`, a project-local keychain. This folder is git-ignored. Because the identity stays the same, the Mac permissions survive rebuilds.
 
