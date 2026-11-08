@@ -533,3 +533,20 @@ details p { color: var(--muted); margin: 0 0 16px; }
 .dl-steps { text-align: left; max-width: 560px; margin: 34px auto 10px; color: var(--muted); display: grid; gap: 10px; }
 .dev summary { font-size: 15px; color: var(--green); padding: 8px 0; }
 .dev { border: 0; }
+
+/* ---------- trackpad edge controls card ---------- */
+.edge-pad { position: relative; height: 120px; margin-top: 22px; border-radius: 16px; background: linear-gradient(#1a2347, #121934);
+  border: 1px solid var(--line); overflow: hidden; }
+.edge-pad::before, .edge-pad::after { content: ""; position: absolute; top: 0; bottom: 0; width: 10%; background: rgba(91, 155, 255, 0.18); }
+.edge-pad::before { left: 0; } .edge-pad::after { right: 0; }
+.edge-pad span { position: absolute; top: 8px; font-size: 14px; } .edge-pad .l { left: 3%; } .edge-pad .r { right: 2.5%; }
+.edge-pad .finger { position: absolute; right: 2%; bottom: 14px; width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85); box-shadow: 0 0 18px rgba(142, 197, 255, 0.9); }
+@media (prefers-reduced-motion: no-preference) {
+  .edge-pad .finger { animation: edge-slide 3.2s ease-in-out infinite; }
+}
+@keyframes edge-slide {
+  0%, 10% { bottom: 14px; right: 2%; scale: 1; } 20% { scale: 0.8; } 45% { bottom: 76px; right: 2%; scale: 0.8; }
+  55% { scale: 1; right: 2%; bottom: 76px; } 60% { right: auto; } 61% { right: 92%; bottom: 14px; }
+  70% { scale: 0.8; } 92% { bottom: 76px; right: 92%; scale: 0.8; } 100% { bottom: 76px; right: 92%; scale: 1; }
+}

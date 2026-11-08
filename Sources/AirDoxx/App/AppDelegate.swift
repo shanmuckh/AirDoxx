@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         model.onShowPhone = { [weak self] in self?.present(.phone) }
         model.start()
         setUpMacKeys()
+        startEdgeControlsIfEnabled()
 
         // Preview aid: AM_PAGE=welcome|permissions|phoneSetup|connect|unavailable opens that page.
         if let raw = ProcessInfo.processInfo.environment["AM_PAGE"] {
@@ -70,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        EdgeControls.shared.stop()
         model.shutdown()
     }
 
@@ -119,6 +121,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         keyInterceptor.start()
         windowController.window?.orderOut(nil)
         hub.show(page: .permissions)
+    }
+
+    // MARK: - Trackpad edge controls (Mac volume / brightness)
+
+    private var edgeControlsEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: "edgeControls") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "edgeControls") }
+    }
+
+    private var edgeRetryTimer: Timer?
+
+    private func startEdgeControlsIfEnabled() {
+        guard edgeControlsEnabled else { return }
+        EdgeControls.shared.start()
+        if !EdgeControls.shared.isRunning, edgeRetryTimer == nil {
+            // Usually waiting for the Accessibility permission: retry quietly.
+            edgeRetryTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] t in
+                guard let self, self.edgeControlsEnabled else { t.invalidate(); self?.edgeRetryTimer = nil; return }
+                EdgeControls.shared.start()
+                if EdgeControls.shared.isRunning { t.invalidate(); self.edgeRetryTimer = nil }
+            }
+        }
+    }
+
+    @objc private func toggleEdgeControls() {
+        edgeControlsEnabled.toggle()
+        if edgeControlsEnabled {
+            startEdgeControlsIfEnabled()
+            windowController.showToast("Trackpad edges: right = Mac volume, left = Mac brightness")
+        } else {
+            EdgeControls.shared.stop()
+        }
     }
 
     @objc private func testNotification() {
@@ -173,6 +207,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         // View
         let view = NSMenu(title: "View")
+        view.addItem(item("Trackpad Edge Controls for Mac", #selector(toggleEdgeControls), ""))
+        view.addItem(.separator())
         view.addItem(item("Larger", #selector(larger), "+"))
         view.addItem(item("Actual Size", #selector(actualSize), "0"))
         view.addItem(item("Smaller", #selector(smaller), "-"))
@@ -247,6 +283,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             return true
         case #selector(toggleScreenOffSetting):
             menuItem.state = model.turnScreenOff ? .on : .off
+            return true
+        case #selector(toggleEdgeControls):
+            menuItem.state = edgeControlsEnabled && EdgeControls.shared.isRunning ? .on : (edgeControlsEnabled ? .mixed : .off)
             return true
         case #selector(toggleClipboard):
             menuItem.state = model.universalClipboard ? .on : .off

@@ -47,6 +47,13 @@ The app is universal (Apple silicon and Intel) and needs macOS 14 Sonoma or late
   - F5 for the voice assistant
   - ⌥⌘D for Do Not Disturb
 
+### Trackpad edge controls for the Mac
+While AirDoxx runs, the volume and brightness keys control the phone, so the trackpad edges control the Mac:
+- **Right edge:** click and slide up or down to change the Mac's volume.
+- **Left edge:** click and slide up or down to change the Mac's brightness.
+
+Each step uses the native macOS indicator and gives a haptic tick, and the pointer stays put while you slide. Hold ⇧⌥ for quarter steps. Turn this on or off under View › Trackpad Edge Controls for Mac.
+
 ### Smart screen handling
 - When the phone locks, its own screen turns on for the fingerprint sensor, and you can also type the PIN from the Mac.
 - Protected screens (GPay, banking) show a "Continue on your phone" notice.

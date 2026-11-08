@@ -76,6 +76,8 @@ final class MacKeyInterceptor {
 
     /// Returns true if the event should be swallowed.
     fileprivate func handle(type: CGEventType, event: CGEvent) -> Bool {
+        // Mac volume/brightness steps posted by the trackpad edge controls go to the Mac, not the phone.
+        if event.getIntegerValueField(.eventSourceUserData) == EdgeControls.syntheticMarker { return false }
         if keyLog != nil {
             if type.rawValue == 14, let ns = NSEvent(cgEvent: event) {
                 log("sysdefined subtype=\(ns.subtype.rawValue) code=\((ns.data1 & 0xFFFF0000) >> 16) state=\(String(format: "%x", (ns.data1 & 0xFF00) >> 8))")
