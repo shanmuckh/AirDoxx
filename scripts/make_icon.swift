@@ -1,7 +1,7 @@
 // Renders the AirDoxx app icon into an .iconset folder.
 // Usage: swift make_icon.swift <out.iconset> [preview.png]
 //
-// Design: a rounded tile in Android green -> teal, with a dark phone behind a frosted-glass phone
+// Design: a royal-blue rounded tile, with a navy phone behind a frosted-glass phone
 // (punch-hole camera + gesture bar) - one phone mirrored onto another.
 import AppKit
 
@@ -43,10 +43,10 @@ func render(_ px: Int) -> Data {
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -10 * u), blur: 28 * u, color: color(0x000000, 0.30).cgColor)
     ctx.addPath(tilePath)
-    ctx.setFillColor(color(0x1BA77A).cgColor)
+    ctx.setFillColor(color(0x2F6BEA).cgColor)
     ctx.fillPath()
     ctx.restoreGState()
-    linear(ctx, tilePath, [color(0x5CF0A8), color(0x22C08A), color(0x0B8C86)],
+    linear(ctx, tilePath, [color(0x6FAEFF), color(0x4A88F7), color(0x2F64E6)],
            from: CGPoint(x: tile.midX, y: tile.maxY), to: CGPoint(x: tile.midX, y: tile.minY))
     // soft top sheen + rim
     ctx.saveGState()
@@ -66,37 +66,37 @@ func render(_ px: Int) -> Data {
     let back = CGRect(x: 318 * u, y: 320 * u, width: 290 * u, height: 486 * u)
     let backPath = roundedRect(back, 62 * u)
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -6 * u), blur: 18 * u, color: color(0x003322, 0.35).cgColor)
-    linear(ctx, backPath, [color(0x0D5E4B), color(0x063A33)],
+    ctx.setShadow(offset: CGSize(width: 0, height: -6 * u), blur: 18 * u, color: color(0x0A1250, 0.35).cgColor)
+    linear(ctx, backPath, [color(0x2A34B0), color(0x16207E)],
            from: CGPoint(x: back.midX, y: back.maxY), to: CGPoint(x: back.midX, y: back.minY))
     ctx.restoreGState()
-    linear(ctx, backPath, [color(0x0F6B55), color(0x07403A)],
+    linear(ctx, backPath, [color(0x2B36B4), color(0x172084)],
            from: CGPoint(x: back.midX, y: back.maxY), to: CGPoint(x: back.midX, y: back.minY))
     ctx.addPath(backPath)
-    ctx.setStrokeColor(color(0x7CF5C0, 0.25).cgColor)
+    ctx.setStrokeColor(color(0x8FB4FF, 0.25).cgColor)
     ctx.setLineWidth(2.5 * u)
     ctx.strokePath()
     // camera dot on the back phone
-    ctx.setFillColor(color(0x9BFFD6, 0.35).cgColor)
+    ctx.setFillColor(color(0xAFC8FF, 0.35).cgColor)
     ctx.fillEllipse(in: CGRect(x: back.midX - 9 * u, y: back.maxY - 40 * u, width: 18 * u, height: 18 * u))
 
     // ---- Front glass phone (lower-right) ----
     let front = CGRect(x: 416 * u, y: 206 * u, width: 292 * u, height: 488 * u)
     let frontPath = roundedRect(front, 62 * u)
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -16 * u), blur: 40 * u, color: color(0x003B2A, 0.45).cgColor)
+    ctx.setShadow(offset: CGSize(width: 0, height: -16 * u), blur: 40 * u, color: color(0x0B1C6E, 0.45).cgColor)
     ctx.addPath(frontPath)
-    ctx.setFillColor(color(0x7FE9C0, 0.55).cgColor)
+    ctx.setFillColor(color(0x8EC5FF, 0.55).cgColor)
     ctx.fillPath()
     ctx.restoreGState()
     // glass body
-    linear(ctx, frontPath, [color(0xD6FFF0, 0.80), color(0x8FEFD0, 0.70), color(0x4FD3C4, 0.78)],
+    linear(ctx, frontPath, [color(0xE4F2FF, 0.82), color(0xA9D4FF, 0.72), color(0x7FC4FF, 0.80)],
            from: CGPoint(x: front.minX, y: front.maxY), to: CGPoint(x: front.maxX, y: front.minY))
     // the back phone seen through the glass (the "mirror")
     ctx.saveGState()
     ctx.addPath(frontPath); ctx.clip()
     ctx.addPath(backPath); ctx.clip()
-    linear(ctx, backPath, [color(0x1F8F78, 0.55), color(0x0E5C55, 0.55)],
+    linear(ctx, backPath, [color(0x7A86F2, 0.70), color(0x4E59D8, 0.70)],
            from: CGPoint(x: back.midX, y: back.maxY), to: CGPoint(x: back.midX, y: back.minY))
     ctx.restoreGState()
     // screen glow
@@ -115,18 +115,18 @@ func render(_ px: Int) -> Data {
     ctx.setLineWidth(4 * u)
     ctx.strokePath()
     ctx.addPath(roundedRect(front.insetBy(dx: 5 * u, dy: 5 * u), 57 * u))
-    ctx.setStrokeColor(color(0x0B7F6A, 0.35).cgColor)
+    ctx.setStrokeColor(color(0x2453C8, 0.35).cgColor)
     ctx.setLineWidth(2 * u)
     ctx.strokePath()
 
     // Android cues: punch-hole camera and gesture bar
-    ctx.setFillColor(color(0x053B33, 0.85).cgColor)
+    ctx.setFillColor(color(0x101A66, 0.85).cgColor)
     ctx.fillEllipse(in: CGRect(x: front.midX - 13 * u, y: front.maxY - 50 * u, width: 26 * u, height: 26 * u))
-    ctx.setFillColor(color(0x5DE0FF, 0.6).cgColor)
+    ctx.setFillColor(color(0x7FD8FF, 0.7).cgColor)
     ctx.fillEllipse(in: CGRect(x: front.midX - 5 * u, y: front.maxY - 42 * u, width: 8 * u, height: 8 * u))
     let pill = CGRect(x: front.midX - 52 * u, y: front.minY + 30 * u, width: 104 * u, height: 12 * u)
     ctx.addPath(roundedRect(pill, 6 * u))
-    ctx.setFillColor(color(0xFFFFFF, 0.95).cgColor)
+    ctx.setFillColor(color(0xC6F0FF, 0.95).cgColor)
     ctx.fillPath()
 
     NSGraphicsContext.restoreGraphicsState()

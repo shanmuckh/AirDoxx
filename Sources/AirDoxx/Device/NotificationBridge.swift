@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import UserNotifications
 
 /// Shows the phone's notifications as macOS notifications (like Phone Link on Windows).
@@ -25,6 +25,22 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
     private var primed = false
     private let lock = NSLock()
 
+    /// Privacy-safe diagnostics (counts and package names only): ~/Library/Logs/AirDoxx/notifications.log
+    private static let logURL: URL = {
+        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/AirDoxx")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("notifications.log")
+    }()
+
+    static func log(_ text: String) {
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(text)\n"
+        if let h = try? FileHandle(forWritingTo: logURL) {
+            h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close()
+        } else {
+            try? Data(line.utf8).write(to: logURL)
+        }
+    }
+
     override init() {
         super.init()
         UNUserNotificationCenter.current().delegate = self
@@ -33,6 +49,23 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
     static func requestPermission(completion: @escaping (Bool) -> Void) {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { ok, _ in
             DispatchQueue.main.async { completion(ok) }
+        }
+    }
+
+    /// Opens AirDoxx's own page in System Settings › Notifications.
+    static func openSettings() {
+        let id = Bundle.main.bundleIdentifier ?? "com.shanmuckh.airdoxx"
+        let urls = ["x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)",
+                    "x-apple.systempreferences:com.apple.Notifications-Settings.extension"]
+        for raw in urls {
+            if let url = URL(string: raw), NSWorkspace.shared.open(url) { return }
+        }
+    }
+
+    /// true when macOS has notifications turned off for AirDoxx (it won't ask again).
+    static func isDenied(completion: @escaping (Bool) -> Void) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async { completion(settings.authorizationStatus == .denied) }
         }
     }
 
@@ -48,6 +81,10 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
         self.serial = serial
         if !same { seen = [:]; primed = false }
         lock.unlock()
+        Self.log("bridge start for \(serial)")
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            Self.log("mac notification permission: \(settings.authorizationStatus.rawValue) (2=authorized) alerts=\(settings.alertSetting.rawValue)")
+        }
         guard timer == nil else { return }
         let t = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
         t.schedule(deadline: .now() + 1, repeating: 4)
@@ -61,6 +98,15 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
         timer = nil
     }
 
+    /// Posts a notification on the phone (via adb) to check the whole phone -> Mac path.
+    static func sendTestNotification(serial: String) {
+        DispatchQueue.global().async {
+            _ = try? ADB.shared.run(["shell", "cmd", "notification", "post", "-t", "'AirDoxx'", "airdoxx_test_\(Int(Date().timeIntervalSince1970))",
+                                     "'Notifications from your phone will appear here.'"], serial: serial, timeout: 8)
+            log("test notification posted on phone")
+        }
+    }
+
     private func poll() {
         lock.lock()
         guard !busy, let serial else { lock.unlock(); return }
@@ -71,7 +117,10 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
         // Filter on the phone so only the relevant lines cross the network.
         let pattern = "NotificationRecord\\(|^      flags=|^      mImportance=|^            when=|android\\.(title|text|bigText)="
         guard let out = try? ADB.shared.run(["shell", "dumpsys notification --noredact | grep -E '\(pattern)'"],
-                                            serial: serial, timeout: 8) else { return }
+                                            serial: serial, timeout: 8) else {
+            Self.log("poll failed (adb)")
+            return
+        }
         let records = Self.parse(out)
 
         lock.lock()
@@ -87,6 +136,8 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
         seen = current
         lock.unlock()
 
+        if firstPass { Self.log("primed with \(records.count) existing notifications") }
+        if !fresh.isEmpty { Self.log("forwarding \(fresh.count): \(fresh.map(\.pkg).joined(separator: ", "))") }
         fresh.forEach(post)
     }
 
@@ -95,7 +146,7 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
         let skipFlags = ["ONGOING_EVENT", "FOREGROUND_SERVICE", "GROUP_SUMMARY", "SILENT"]
         if skipFlags.contains(where: { n.flags.contains($0) }) { return false }
         if ["MIN", "LOW", "NONE"].contains(n.importance) { return false }
-        let systemPackages = ["android", "com.android.systemui", "com.android.shell"]
+        let systemPackages = ["android", "com.android.systemui"]
         return !systemPackages.contains(n.pkg)
     }
 
@@ -111,7 +162,14 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
                 if let c = cur { records.append(c) }
                 var n = PhoneNotification()
                 if let pkg = value(after: "pkg=", in: line) { n.pkg = String(pkg.prefix { $0 != " " }) }
-                if let key = value(after: " key=", in: line) { n.key = String(key.prefix { $0 != " " && $0 != ":" }) }
+                if let key = value(after: " key=", in: line) {
+                    n.key = String(key.prefix { $0 != " " && $0 != ":" })
+                } else {
+                    // Long tags (e.g. WhatsApp) wrap the header before "key=": build one from pkg/id/tag.
+                    let id = value(after: " id=", in: line).map { String($0.prefix { $0 != " " }) } ?? "?"
+                    let tag = value(after: " tag=", in: line).map { String($0.prefix { $0 != " " }) } ?? ""
+                    n.key = "\(n.pkg)|\(id)|\(tag)"
+                }
                 cur = n
             } else if cur != nil {
                 let t = line.trimmingCharacters(in: .whitespaces)
@@ -145,7 +203,9 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
         content.threadIdentifier = n.pkg
         content.userInfo = ["pkg": n.pkg]
         let request = UNNotificationRequest(identifier: "phone-\(n.key)-\(n.when)", content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error { Self.log("post failed for \(n.pkg): \(error.localizedDescription)") }
+        }
     }
 
     static func appName(for pkg: String) -> String {

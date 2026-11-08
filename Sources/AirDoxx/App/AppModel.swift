@@ -808,6 +808,12 @@ extension AppModel: MirrorSessionDelegate {
             presentation = .phone
         }
         notifications.start(serial: session.device.serial)
+        NotificationBridge.isDenied { [weak self] denied in
+            guard denied else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
+                self?.windowController.showToast("Phone notifications are off – Phone › Permissions…")
+            }
+        }
         startClipboardSync()
         startSecureMonitor(for: session)
         nowPlaying.onKey = { [weak self] code in self?.session?.pressKey(code) }

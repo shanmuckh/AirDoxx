@@ -118,8 +118,8 @@ private struct MacBookDrawing: View {
             HStack(spacing: 5) {
                 ForEach(0..<12, id: \.self) { i in
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(i == 7 ? AnyShapeStyle(LinearGradient(colors: [Color(red: 0.36, green: 0.94, blue: 0.66),
-                                                                              Color(red: 0.05, green: 0.55, blue: 0.53)],
+                        .fill(i == 7 ? AnyShapeStyle(LinearGradient(colors: [Color(red: 0.44, green: 0.68, blue: 1.0),
+                                                                              Color(red: 0.18, green: 0.39, blue: 0.90)],
                                                                      startPoint: .top, endPoint: .bottom))
                                      : AnyShapeStyle(Color.white.opacity(0.16)))
                         .frame(width: 19, height: 19)

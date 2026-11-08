@@ -121,6 +121,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         hub.show(page: .permissions)
     }
 
+    @objc private func testNotification() {
+        guard let serial = model.session?.device.serial else { return }
+        NotificationBridge.sendTestNotification(serial: serial)
+        windowController.showToast("Sent a test notification from your phone")
+    }
+
     @objc private func showWelcome() {
         windowController.window?.orderOut(nil)
         hub.show(page: .welcome)
@@ -200,6 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         phone.addItem(item("Show on Mac Only (Phone Screen Off)", #selector(toggleScreenOffSetting), "p", [.command, .shift]))
         phone.addItem(item("Play Phone Audio on Mac", #selector(toggleAudio), ""))
         phone.addItem(item("Permissions…", #selector(requestMacKeys), ""))
+        phone.addItem(item("Send Test Notification", #selector(testNotification), ""))
         main.addItem(submenu(phone, title: "Phone"))
 
         // Window

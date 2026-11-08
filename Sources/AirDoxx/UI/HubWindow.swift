@@ -12,6 +12,7 @@ final class HubModel: ObservableObject {
     @Published var forward = true
     @Published var keysAllowed = MacKeyInterceptor.hasPermission
     @Published var notificationsAllowed = false
+    @Published var notificationsDenied = false
     @Published var qrImage: NSImage?
     @Published var pairingStatus = "Waiting for your phone to scan…"
     @Published var unavailableDetail = ""
@@ -23,6 +24,7 @@ final class HubModel: ObservableObject {
     init(app: AppModel) {
         self.app = app
         NotificationBridge.permissionStatus { [weak self] ok in self?.notificationsAllowed = ok }
+        NotificationBridge.isDenied { [weak self] denied in self?.notificationsDenied = denied }
     }
 
     func go(_ page: Page) {
@@ -40,11 +42,11 @@ final class HubModel: ObservableObject {
     }
 
     func allowNotifications() {
+        // Once denied, macOS never shows its prompt again: go straight to AirDoxx's settings page.
+        if notificationsDenied { NotificationBridge.openSettings(); startPermissionWatch(); return }
         NotificationBridge.requestPermission { [weak self] ok in
             withAnimation { self?.notificationsAllowed = ok }
-            if !ok, let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
-                NSWorkspace.shared.open(url)
-            }
+            if !ok { self?.notificationsDenied = true; NotificationBridge.openSettings() }
         }
     }
 
@@ -57,6 +59,7 @@ final class HubModel: ObservableObject {
             NotificationBridge.permissionStatus { ok in
                 if ok != self.notificationsAllowed { withAnimation { self.notificationsAllowed = ok } }
             }
+            NotificationBridge.isDenied { denied in self.notificationsDenied = denied }
         }
     }
 
@@ -235,8 +238,12 @@ private struct PermissionsPage: View {
                               detail: "Type on your phone, and send volume, brightness, media and search keys to it.",
                               granted: model.keysAllowed, action: model.allowKeys)
                 PermissionRow(symbol: "bell.badge", title: "Notifications",
-                              detail: "Show your phone's notifications on this Mac.",
-                              granted: model.notificationsAllowed, action: model.allowNotifications)
+                              detail: model.notificationsDenied
+                                  ? "Turned off in System Settings. Switch on “Allow notifications” for AirDoxx."
+                                  : "Show your phone's notifications on this Mac.",
+                              granted: model.notificationsAllowed,
+                              buttonTitle: model.notificationsDenied ? "Open Settings" : "Allow",
+                              action: model.allowNotifications)
             }
             .frame(width: 560)
             .padding(.top, 50)
@@ -256,6 +263,7 @@ private struct PermissionRow: View {
     let title: String
     let detail: String
     let granted: Bool
+    var buttonTitle = "Allow"
     let action: () -> Void
 
     var body: some View {
@@ -278,7 +286,7 @@ private struct PermissionRow: View {
                     .foregroundStyle(AirDoxxColor.accent)
                     .transition(.scale.combined(with: .opacity))
             } else {
-                Button("Allow", action: action)
+                Button(buttonTitle, action: action)
                     .buttonStyle(PrimaryPillButtonStyle())
                     .transition(.scale.combined(with: .opacity))
             }

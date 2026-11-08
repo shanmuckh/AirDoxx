@@ -50,7 +50,7 @@ setInterval(tickClock, 30_000);
       s.a += 0.01; s.y -= s.v * devicePixelRatio;
       if (s.y < 0) s.y = canvas.height;
       ctx.globalAlpha = 0.25 + 0.35 * Math.abs(Math.sin(s.a));
-      ctx.fillStyle = '#bff5d8';
+      ctx.fillStyle = '#cfe0ff';
       ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
     }
     if (!reduceMotion) requestAnimationFrame(draw);
@@ -116,7 +116,7 @@ if (!reduceMotion && !CSS.supports('(animation-timeline: view()) and (animation-
     const [app, who, msg] = toasts[i++ % toasts.length];
     const el = document.createElement('div');
     el.className = 'mac-toast';
-    el.innerHTML = `<img src="assets/icon.png" alt=""><div><small>${app} · now</small><br><b>${who}</b> ${msg}</div>`;
+    el.innerHTML = `<img src="assets/icon.png?v=2" alt=""><div><small>${app} · now</small><br><b>${who}</b> ${msg}</div>`;
     stack.prepend(el);
     setTimeout(() => el.remove(), 4800);
   }
@@ -168,7 +168,7 @@ if (!reduceMotion && !CSS.supports('(animation-timeline: view()) and (animation-
       app.hidden = false;
       home.hidden = true;
       const bar = $('.app-bar', app);
-      bar.style.setProperty('--c', color === '#ffffff' ? '#3ddc84' : color);
+      bar.style.setProperty('--c', color === '#ffffff' ? '#4a7ef5' : color);
       bar.textContent = `${emoji}  ${name}`;
       $('.app-body', app).innerHTML = '<i></i>'.repeat(9);
       syncReal();
