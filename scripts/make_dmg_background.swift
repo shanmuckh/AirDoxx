@@ -48,11 +48,25 @@ func render(scale: CGFloat) -> Data {
     head.lineJoinStyle = .round
     head.stroke()
 
+    // First-launch hint (AirDoxx isn't notarized by Apple yet, so macOS asks once)
+    let hintBox = NSRect(x: 70, y: 66, width: 520, height: 46)
+    let hintPath = NSBezierPath(roundedRect: hintBox, xRadius: 12, yRadius: 12)
+    NSColor(white: 0, alpha: 0.05).setFill()
+    hintPath.fill()
+    let hintTitle: [NSAttributedString.Key: Any] = [
+        .font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: NSColor.black, .paragraphStyle: para]
+    ("First launch: if macOS says it can't verify AirDoxx, click Done," as NSString)
+        .draw(in: NSRect(x: 70, y: 88, width: 520, height: 18), withAttributes: hintTitle)
+    let hintBody: [NSAttributedString.Key: Any] = [
+        .font: NSFont.systemFont(ofSize: 12, weight: .regular), .foregroundColor: NSColor(white: 0.3, alpha: 1), .paragraphStyle: para]
+    ("then System Settings › Privacy & Security › Open Anyway." as NSString)
+        .draw(in: NSRect(x: 70, y: 71, width: 520, height: 18), withAttributes: hintBody)
+
     // Footer
     let foot: [NSAttributedString.Key: Any] = [
         .font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor(white: 0.55, alpha: 1),
         .paragraphStyle: para, .kern: 1.2]
-    ("AIRDOXX · YOUR ANDROID, ON YOUR MAC" as NSString).draw(in: NSRect(x: 0, y: 26, width: 660, height: 16), withAttributes: foot)
+    ("AIRDOXX · YOUR ANDROID, ON YOUR MAC" as NSString).draw(in: NSRect(x: 0, y: 30, width: 660, height: 16), withAttributes: foot)
 
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])!

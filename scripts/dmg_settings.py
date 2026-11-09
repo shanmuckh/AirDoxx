@@ -12,7 +12,8 @@ icon_locations = {os.path.basename(app): (165, 190), "Applications": (495, 190)}
 format = "UDZO"
 filesystem = "HFS+"
 background = background_path
-window_rect = ((200, 160), (660, 400))
+# Finder counts the title bar in the window height: 400 pt of background + ~28 pt title bar.
+window_rect = ((200, 160), (660, 428))
 default_view = "icon-view"
 show_status_bar = False
 show_tab_view = False
