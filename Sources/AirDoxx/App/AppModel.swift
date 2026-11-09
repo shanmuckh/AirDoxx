@@ -146,6 +146,9 @@ final class AppModel: NSObject, ObservableObject {
         set { defaults.set(newValue, forKey: "wirelessMap") }
     }
 
+    /// A phone has been connected before (so a failure most likely means Wireless debugging is off).
+    var knowsAPhone: Bool { !wirelessMap.isEmpty || lastWirelessAddress != nil }
+
     var lastWirelessAddress: String? {
         get { defaults.string(forKey: "lastWirelessAddress") }
         set { defaults.set(newValue, forKey: "lastWirelessAddress") }
@@ -173,6 +176,7 @@ final class AppModel: NSObject, ObservableObject {
     }
 
     func shutdown() {
+        restoreRotationIfNeeded(wait: true)
         session?.stop()
         session = nil
     }
@@ -236,6 +240,13 @@ final class AppModel: NSObject, ObservableObject {
     }
 
     private var forgottenPhonesSnapshot: Set<String> = []
+    private var pairingPromptShown = false
+
+    private func phoneNeedsPairing() {
+        guard !pairingPromptShown, session == nil, presentation != .setup else { return }
+        pairingPromptShown = true
+        presentation = .setup   // opens the Connect page with the pairing QR code
+    }
 
     private func poll() {
         guard isLookingForDevices, !polling else { return }
@@ -252,7 +263,12 @@ final class AppModel: NSObject, ObservableObject {
                 for svc in ADB.shared.mdnsServices() where svc.type.hasPrefix("_adb-tls-connect") {
                     if connected.contains(svc.address) || connected.contains(where: { $0.hasPrefix(svc.name) }) { continue }
                     if let hw = svc.hardwareSerial, skip.contains(hw) { continue }
-                    _ = try? ADB.shared.run(["connect", svc.address], timeout: 5)
+                    let out = (try? ADB.shared.run(["connect", svc.address], timeout: 5)) ?? ""
+                    if !out.contains("connected to") {
+                        // The phone is advertising Wireless debugging but rejects this Mac's key:
+                        // it was only temporarily trusted. It needs to be paired (once, for good).
+                        DispatchQueue.main.async { self?.phoneNeedsPairing() }
+                    }
                 }
             }
             let found = (try? ADB.shared.devices()) ?? []
@@ -429,6 +445,7 @@ final class AppModel: NSObject, ObservableObject {
     /// Ends mirroring. The phone stays paired: "Reconnect" (or the next launch) connects again.
     func disconnect() {
         guard let s = session else { return }
+        restoreRotationIfNeeded(wait: true)
         let name = windowController.window?.title ?? s.device.displayName
         lastDevice = s.device
         s.stop()
@@ -461,6 +478,7 @@ final class AppModel: NSObject, ObservableObject {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         let hw = hardwareSerial(of: device)
+        restoreRotationIfNeeded(wait: true)
         if let s = session { s.stop(); endSession(s) }
         var forgotten = forgottenPhones
         forgotten.insert(hw)
@@ -532,8 +550,56 @@ final class AppModel: NSObject, ObservableObject {
         windowController.showToast(turnScreenOff ? "Mac only – phone screen off" : "Showing on both screens")
     }
 
+    // MARK: - Rotation
+    //
+    // Rotating the display isn't enough: apps such as YouTube lock their screens to portrait and
+    // Android honours that over a frozen rotation. So "landscape" also tells the display to ignore
+    // apps' orientation requests (Android 12L+). Everything is restored on portrait, disconnect,
+    // quit, or (after a dropped connection) the next time the phone connects.
+
+    private struct SavedRotation: Codable { var serial: String; var accelerometer: String; var userRotation: String }
+
+    private var savedRotation: SavedRotation? {
+        get { (defaults.data(forKey: "savedRotation")).flatMap { try? JSONDecoder().decode(SavedRotation.self, from: $0) } }
+        set { defaults.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: "savedRotation") }
+    }
+
+    var isForcedLandscape: Bool { savedRotation != nil }
+
     func rotatePhone() {
-        session?.send(ControlMessage.rotateDevice)
+        guard let serial = session?.device.serial else { return }
+        if let saved = savedRotation {
+            savedRotation = nil
+            work.async { Self.restoreRotation(saved, serial: serial) }
+            windowController.showToast("Portrait")
+        } else {
+            work.async { [weak self] in
+                let adb = ADB.shared
+                let accel = (try? adb.run(["shell", "settings", "get", "system", "accelerometer_rotation"], serial: serial, timeout: 5))?.trimmed ?? "1"
+                let user = (try? adb.run(["shell", "settings", "get", "system", "user_rotation"], serial: serial, timeout: 5))?.trimmed ?? "0"
+                let saved = SavedRotation(serial: serial, accelerometer: accel, userRotation: user)
+                DispatchQueue.main.async { self?.savedRotation = saved }
+                _ = try? adb.run(["shell", "wm set-ignore-orientation-request true; settings put system accelerometer_rotation 0; settings put system user_rotation 1"],
+                                 serial: serial, timeout: 8)
+            }
+            windowController.showToast("Landscape")
+        }
+    }
+
+    private static func restoreRotation(_ saved: SavedRotation, serial: String) {
+        let accel = ["0", "1"].contains(saved.accelerometer) ? saved.accelerometer : "1"
+        let user = ["0", "1", "2", "3"].contains(saved.userRotation) ? saved.userRotation : "0"
+        _ = try? ADB.shared.run(["shell", "wm set-ignore-orientation-request false; settings put system user_rotation \(user); settings put system accelerometer_rotation \(accel)"],
+                                serial: serial, timeout: 8)
+    }
+
+    /// Undo a forced landscape (synchronously when quitting).
+    func restoreRotationIfNeeded(wait: Bool = false) {
+        guard let saved = savedRotation else { return }
+        let serial = session?.device.serial ?? saved.serial
+        savedRotation = nil
+        if wait { Self.restoreRotation(saved, serial: serial) }
+        else { work.async { Self.restoreRotation(saved, serial: serial) } }
     }
 
     // The phone's own screen is on when the user wants both screens, or while the phone is
@@ -808,6 +874,7 @@ extension AppModel: MirrorSessionDelegate {
             presentation = .phone
         }
         notifications.start(serial: session.device.serial)
+        restoreRotationIfNeeded()   // a previous session may have ended while in forced landscape
         NotificationBridge.isDenied { [weak self] denied in
             guard denied else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {

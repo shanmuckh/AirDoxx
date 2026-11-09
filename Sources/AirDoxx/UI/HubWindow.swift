@@ -29,7 +29,7 @@ final class HubModel: ObservableObject {
 
     func go(_ page: Page) {
         forward = page > self.page
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { self.page = page }
+        withAnimation(.spring(response: 0.62, dampingFraction: 0.92)) { self.page = page }
         if page == .permissions { startPermissionWatch() } else { permissionTimer?.invalidate() }
         if page == .connect { startPairing() } else { stopPairing() }
     }
@@ -99,6 +99,7 @@ final class HubWindowController: NSWindowController, NSWindowDelegate {
         window.backgroundColor = .clear
         window.title = "AirDoxx"
         window.isReleasedWhenClosed = false
+        window.animationBehavior = .documentWindow
         window.standardWindowButton(.zoomButton)?.isEnabled = false
         // Real frosted glass: the desktop blurs through behind the content.
         let glass = NSVisualEffectView()
@@ -167,9 +168,10 @@ struct HubView: View {
                 }
             }
             .id(model.page)
+            // Elegant page change: a short glide + fade + slight scale, not a full-width slide.
             .transition(.asymmetric(
-                insertion: .move(edge: model.forward ? .trailing : .leading).combined(with: .opacity),
-                removal: .move(edge: model.forward ? .leading : .trailing).combined(with: .opacity)))
+                insertion: .offset(x: model.forward ? 40 : -40).combined(with: .opacity).combined(with: .scale(scale: 0.985)),
+                removal: .offset(x: model.forward ? -40 : 40).combined(with: .opacity).combined(with: .scale(scale: 0.985))))
         }
         .frame(width: 760, height: 640)
         .preferredColorScheme(.dark)
@@ -440,7 +442,11 @@ private struct UnavailablePage: View {
             MirrorIllustration()
         } content: {
             VStack(alignment: .leading, spacing: 10) {
-                Text("To use AirDoxx, make sure your Android phone is nearby, turned on, with USB debugging enabled, and connected to this Mac with a cable or on the same Wi-Fi network.")
+                if model.app.knowsAPhone {
+                    Text("Turn on **Wireless debugging** on your phone (Settings › Developer options) – Android switches it off after a restart. AirDoxx reconnects by itself, no pairing needed. Or plug the phone in with USB once.")
+                } else {
+                    Text("To use AirDoxx, make sure your Android phone is nearby, turned on, with USB debugging enabled, and connected to this Mac with a cable or on the same Wi-Fi network.")
+                }
                 if let first = model.unavailableDetail.split(separator: "\n").first, !first.isEmpty {
                     Text(String(first))
                         .font(.system(size: 12, design: .monospaced))

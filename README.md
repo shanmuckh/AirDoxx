@@ -8,13 +8,29 @@ AirDoxx is a native macOS app that mirrors and controls an Android phone, modell
 
 ## Download
 
-**[⬇ Download AirDoxx 1.0 for Mac (DMG)](https://github.com/shanmuckh/AirDox/releases/latest/download/AirDoxx.dmg)**
+**[⬇ Download AirDoxx 2.0 for Mac](https://shanmuckh.github.io/AirDox/download/AirDoxx.dmg)**. The same file is attached to the [latest release](https://github.com/shanmuckh/AirDox/releases/latest).
 
 The app is universal (Apple silicon and Intel) and needs macOS 14 Sonoma or later.
 
-1. Open `AirDoxx.dmg` and drag **AirDoxx** into **Applications**.
-2. The first launch needs one extra step, because AirDoxx isn't notarized by Apple yet. Open it and click **Done** on the warning. Then go to **System Settings › Privacy & Security**, scroll down and click **Open Anyway**.
-3. Follow the welcome screen. It asks for the Mac permissions and helps you connect your phone.
+1. Open `AirDoxx.dmg`. A window shows AirDoxx, an arrow and your Applications folder. Drag AirDoxx in. You can also just open AirDoxx and it offers to move itself.
+2. **First launch only:** AirDoxx isn't notarized by Apple yet. If macOS says it can't verify AirDoxx, click **Done**, then **System Settings › Privacy & Security › Open Anyway**.
+3. Follow the welcome screen. It asks for the Mac permissions and pairs your phone.
+
+### What's new in 2.0
+- **Rotate goes landscape in any app,** including YouTube's portrait-locked watch page. Your rotation settings are restored afterwards.
+- **Smoother, calmer motion:**
+  - native window open and close
+  - the connecting screen dissolves into the live phone
+  - gentler page, toolbar and toast animations
+- **Installing:**
+  - a styled installer window with drag-to-Applications
+  - the app offers to move itself into Applications if you open it from somewhere else
+- **Pairing problems are explained:**
+  - if the phone rejects this Mac, AirDoxx opens QR pairing by itself
+  - if Wireless debugging is off, it tells you to turn it back on
+- **New website:** black and white, and Download now downloads the DMG straight from the site.
+
+The previous version is kept on the [`v1` branch](https://github.com/shanmuckh/AirDox/tree/v1).
 
 ## Features
 
@@ -86,7 +102,7 @@ brew install scrcpy
 ```
 This builds AirDoxx and installs it in **/Applications**, so it shows up in Finder, Launchpad and Spotlight. The script copies `adb` and the scrcpy server into the app bundle.
 
-To build the release DMG instead, run `./scripts/build_app.sh --release`. It produces a universal app, `build/AirDoxx.dmg` and a SHA-256 checksum.
+To build the release DMG instead, run `./scripts/build_app.sh --release`. It produces a universal app, `build/AirDoxx.dmg` and a SHA-256 checksum, and copies the DMG to `docs/download/` for the website. If `dmgbuild` is installed (`pip install dmgbuild`), the DMG gets the styled drag-to-Applications window.
 
 The app is signed with a self-signed identity kept in `.signing/`, a project-local keychain. This folder is git-ignored. Because the identity stays the same, the Mac permissions survive rebuilds.
 

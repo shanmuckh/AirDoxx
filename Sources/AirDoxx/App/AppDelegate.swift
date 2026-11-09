@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var presentationObserver: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppMover.offerMoveIfNeeded()
         windowController = MirrorWindowController(model: model)
         model.windowController = windowController
         NSApp.mainMenu = buildMenu()

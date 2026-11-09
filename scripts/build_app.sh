@@ -5,8 +5,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="AirDoxx"
-APP_VERSION="1.0.0"
-BUILD_NUMBER="1"
+APP_VERSION="2.0.0"
+BUILD_NUMBER="2"
 MODE="${1:-}"   # "", "--install" or "--release"
 APP="build/$APP_NAME.app"
 CONTENTS="$APP/Contents"
@@ -166,14 +166,31 @@ fi
 # ./scripts/build_app.sh --release  builds a universal app and build/AirDoxx.dmg
 # (drag-to-Applications layout) ready to attach to a GitHub release.
 if [[ "$MODE" == "--release" ]]; then
-    STAGE="build/dmg-stage"
     DMG="build/$APP_NAME.dmg"
-    rm -rf "${STAGE:?}" "${DMG:?}"
-    mkdir -p "$STAGE"
-    cp -R "$APP" "$STAGE/"
-    ln -s /Applications "$STAGE/Applications"
-    hdiutil create -volname "$APP_NAME $APP_VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
-    rm -rf "${STAGE:?}"
+    rm -f "${DMG:?}"
+    DMGBUILD_BIN="${DMGBUILD:-$(command -v dmgbuild || true)}"
+    if [[ -n "$DMGBUILD_BIN" ]]; then
+        # Styled installer window: app on the left, Applications on the right, arrow between.
+        ASSETS="build/dmg-assets"
+        rm -rf "${ASSETS:?}"
+        swift scripts/make_dmg_background.swift "$ASSETS"
+        tiffutil -cathidpicheck "$ASSETS/background.png" "$ASSETS/background@2x.png" -out "$ASSETS/background.tiff" >/dev/null
+        "$DMGBUILD_BIN" -s scripts/dmg_settings.py -D app="$APP" -D background="$ASSETS/background.tiff" \
+            "$APP_NAME $APP_VERSION" "$DMG"
+        echo "==> Styled DMG (dmgbuild)"
+    else
+        STAGE="build/dmg-stage"
+        rm -rf "${STAGE:?}"
+        mkdir -p "$STAGE"
+        cp -R "$APP" "$STAGE/"
+        ln -s /Applications "$STAGE/Applications"
+        hdiutil create -volname "$APP_NAME $APP_VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+        rm -rf "${STAGE:?}"
+        echo "!!  dmgbuild not found (pip install dmgbuild): built a plain DMG"
+    fi
+    # The website serves the DMG itself, so "Download" downloads the file directly.
+    mkdir -p docs/download
+    cp "$DMG" docs/download/AirDoxx.dmg
     shasum -a 256 "$DMG" | tee "$DMG.sha256"
     echo "==> Release DMG: $DMG"
 fi

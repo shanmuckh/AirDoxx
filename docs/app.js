@@ -1,27 +1,24 @@
-// AirDoxx website interactions. Plain JS, no dependencies.
+// AirDoxx website interactions. Plain JS, no dependencies. Black & white only.
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 
-const APPS = [
-  ['#25d366', '💬', 'WhatsApp'], ['#ffffff', '📷', 'Camera'], ['#fbbc04', '📁', 'Files'], ['#e8eaed', '⚙️', 'Settings'],
-  ['#4285f4', '🗺️', 'Maps'], ['#3c4043', '🎵', 'Music'], ['#34a853', '📞', 'Phone'], ['#00bcd4', '🌤️', 'Weather'],
-  ['#ff6d00', '🛒', 'Shop'], ['#ffffff', '📅', 'Calendar'], ['#ea4335', '▶️', 'YouTube'], ['#7c4dff', '🎮', 'Games'],
-  ['#c51162', '📸', 'Instagram'], ['#1a73e8', '✉️', 'Gmail'], ['#00897b', '💳', 'Wallet'], ['#f57c00', '🍔', 'Food'],
-];
+// Monochrome "apps": shades of grey, so the mockups stay black & white.
+const SHADES = ['#ffffff', '#d9d9d9', '#bdbdbd', '#8c8c8c', '#5c5c5c', '#2e2e2e', '#efefef', '#a6a6a6'];
+const APPS = ['Messages', 'Camera', 'Files', 'Settings', 'Maps', 'Music', 'Phone', 'Weather',
+  'Shop', 'Calendar', 'Video', 'Games', 'Photos', 'Mail', 'Wallet', 'Food'];
 
-/* ---------- hero: word stagger, app grids, lock clock ---------- */
+/* ---------- hero ---------- */
 $$('.hero-title .word').forEach((w, i) => w.style.setProperty('--i', i));
 
-function fillGrid(grid, count) {
-  for (let i = 0; i < count; i++) {
+$$('.app-grid').forEach((grid) => {
+  for (let i = 0; i < 20; i++) {
     const cell = document.createElement('i');
-    cell.style.setProperty('--c', APPS[i % APPS.length][0]);
+    cell.style.setProperty('--c', SHADES[(i * 3) % SHADES.length]);
     cell.style.setProperty('--i', i);
     grid.append(cell);
   }
-}
-$$('.app-grid').forEach((g) => fillGrid(g, g.classList.contains('big') ? 20 : 20));
+});
 
 function tickClock() {
   const now = new Date();
@@ -31,69 +28,35 @@ function tickClock() {
 tickClock();
 setInterval(tickClock, 30_000);
 
-/* ---------- starfield ---------- */
-(() => {
-  const canvas = $('#stars');
-  const ctx = canvas.getContext('2d');
-  let stars = [];
-  function resize() {
-    canvas.width = innerWidth * devicePixelRatio;
-    canvas.height = innerHeight * devicePixelRatio;
-    stars = Array.from({ length: Math.min(160, innerWidth / 8) }, () => ({
-      x: Math.random() * canvas.width, y: Math.random() * canvas.height,
-      r: Math.random() * 1.4 * devicePixelRatio + 0.3, v: Math.random() * 0.25 + 0.05, a: Math.random(),
-    }));
-  }
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (const s of stars) {
-      s.a += 0.01; s.y -= s.v * devicePixelRatio;
-      if (s.y < 0) s.y = canvas.height;
-      ctx.globalAlpha = 0.25 + 0.35 * Math.abs(Math.sin(s.a));
-      ctx.fillStyle = '#cfe0ff';
-      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
-    }
-    if (!reduceMotion) requestAnimationFrame(draw);
-  }
-  resize(); draw();
-  addEventListener('resize', resize);
-})();
-
-/* ---------- cursor glow + magnetic buttons ---------- */
+/* ---------- pointer effects (fine pointers only) ---------- */
 if (!reduceMotion && matchMedia('(pointer: fine)').matches) {
-  const glow = $('.cursor-glow');
-  addEventListener('pointermove', (e) => {
-    glow.style.setProperty('--mx', `${e.clientX}px`);
-    glow.style.setProperty('--my', `${e.clientY}px`);
-  }, { passive: true });
-
-  $$('.magnetic').forEach((btn) => {
+  // Magnetic buttons + a soft sheen that follows the pointer.
+  $$('.pill').forEach((btn) => {
     btn.addEventListener('pointermove', (e) => {
       const r = btn.getBoundingClientRect();
-      btn.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * 0.25}px, ${(e.clientY - r.top - r.height / 2) * 0.35}px)`;
+      btn.style.setProperty('--px', `${e.clientX - r.left}px`);
+      btn.style.setProperty('--py', `${e.clientY - r.top}px`);
+      if (btn.classList.contains('magnetic')) {
+        btn.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * 0.18}px, ${(e.clientY - r.top - r.height / 2) * 0.28}px)`;
+      }
     });
     btn.addEventListener('pointerleave', () => { btn.style.transform = ''; });
   });
 
-  // 3D tilt + spotlight on cards and the hero mirror window
+  // Spotlight on feature tiles; gentle 3D on the hero's mirror window.
   $$('.tilt, [data-tilt]').forEach((el) => {
     el.addEventListener('pointermove', (e) => {
       const r = el.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-      el.style.setProperty('--rx', `${(0.5 - y) * 10}deg`);
-      el.style.setProperty('--ry', `${(x - 0.5) * 12}deg`);
       el.style.setProperty('--gx', `${x * 100}%`);
       el.style.setProperty('--gy', `${y * 100}%`);
-      if (el.matches('[data-tilt]')) el.style.transform = `translateZ(30px) rotateY(${(x - 0.5) * 16}deg) rotateX(${(0.5 - y) * 12}deg)`;
+      if (el.matches('[data-tilt]')) el.style.transform = `translateZ(30px) rotateY(${(x - 0.5) * 14}deg) rotateX(${(0.5 - y) * 10}deg)`;
     });
-    el.addEventListener('pointerleave', () => {
-      el.style.setProperty('--rx', '0deg'); el.style.setProperty('--ry', '0deg');
-      if (el.matches('[data-tilt]')) el.style.transform = '';
-    });
+    el.addEventListener('pointerleave', () => { if (el.matches('[data-tilt]')) el.style.transform = ''; });
   });
 }
 
-/* ---------- reveal fallback (no scroll-driven animations, e.g. Firefox) ---------- */
+/* ---------- reveal fallback (browsers without scroll-driven animations) ---------- */
 if (!reduceMotion && !CSS.supports('(animation-timeline: view()) and (animation-range: entry)')) {
   const io = new IntersectionObserver((entries) => {
     for (const entry of entries) {
@@ -103,25 +66,24 @@ if (!reduceMotion && !CSS.supports('(animation-timeline: view()) and (animation-
   $$('.reveal').forEach((el) => { el.classList.add('pending'); io.observe(el); });
 }
 
-/* ---------- hero: phone notifications flying to the Mac ---------- */
+/* ---------- hero: phone notifications arriving on the Mac ---------- */
 (() => {
   const stack = $('#heroToasts');
   const toasts = [
-    ['WhatsApp', 'Maya', 'Dinner at 8? 🍝'], ['Instagram', 'arjun.k', 'liked your reel'],
-    ['Messages', 'Bank', 'OTP is ready on your phone'], ['Gmail', 'GitHub', 'Your build passed ✅'],
-    ['Calendar', 'Standup', 'in 10 minutes'],
+    ['Messages', 'Maya', 'Dinner at 8?'], ['Photos', 'Memories', 'A year ago today'],
+    ['Mail', 'GitHub', 'Your build passed'], ['Calendar', 'Standup', 'in 10 minutes'],
   ];
   let i = 0;
   function push() {
     const [app, who, msg] = toasts[i++ % toasts.length];
     const el = document.createElement('div');
     el.className = 'mac-toast';
-    el.innerHTML = `<img src="assets/icon.png?v=2" alt=""><div><small>${app} · now</small><br><b>${who}</b> ${msg}</div>`;
+    el.innerHTML = `<img src="assets/icon.png?v=3" alt=""><div><small>${app} · now</small><br><b>${who}</b> ${msg}</div>`;
     stack.prepend(el);
-    setTimeout(() => el.remove(), 4800);
+    setTimeout(() => el.remove(), 4900);
   }
-  setTimeout(push, 1800);
-  setInterval(push, reduceMotion ? 8000 : 3400);
+  setTimeout(push, 2200);
+  setInterval(push, reduceMotion ? 9000 : 4200);
 })();
 
 /* ---------- story: sticky phone follows the active step ---------- */
@@ -157,27 +119,23 @@ if (!reduceMotion && !CSS.supports('(animation-timeline: view()) and (animation-
     t.updateCallbackDone.catch(() => {});
   };
 
-  APPS.forEach(([color, emoji, name]) => {
+  APPS.forEach((name, i) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.style.setProperty('--c', color);
-    b.textContent = emoji;
+    b.style.setProperty('--c', SHADES[(i * 3) % SHADES.length]);
     b.title = name;
     b.setAttribute('aria-label', `Open ${name}`);
     b.addEventListener('click', () => transition(() => {
       app.hidden = false;
       home.hidden = true;
-      const bar = $('.app-bar', app);
-      bar.style.setProperty('--c', color === '#ffffff' ? '#4a7ef5' : color);
-      bar.textContent = `${emoji}  ${name}`;
+      $('.app-bar', app).textContent = name;
       $('.app-body', app).innerHTML = '<i></i>'.repeat(9);
-      syncReal();
     }));
     home.append(b);
   });
 
-  function goHome() { transition(() => { app.hidden = true; home.hidden = false; syncReal(); }); }
-  function syncReal() { real.classList.toggle('on', bothScreens); }
+  const goHome = () => transition(() => { app.hidden = true; home.hidden = false; });
+  const syncReal = () => real.classList.toggle('on', bothScreens);
 
   $$('.tools button').forEach((btn) => btn.addEventListener('click', () => {
     const act = btn.dataset.act;
@@ -199,63 +157,52 @@ if (!reduceMotion && !CSS.supports('(animation-timeline: view()) and (animation-
   function loop() {
     taps++;
     row.classList.add('tapped');
-    setTimeout(() => row.classList.remove('tapped'), 140);
+    setTimeout(() => row.classList.remove('tapped'), 160);
     count.textContent = taps < 7 ? `×${taps}` : '✓';
     if (taps === 7) {
       toast.classList.add('show');
-      setTimeout(() => { sw1.classList.add('on'); }, 600);
-      setTimeout(() => { sw2.classList.add('on'); }, 1200);
+      setTimeout(() => sw1.classList.add('on'), 700);
+      setTimeout(() => sw2.classList.add('on'), 1400);
       setTimeout(() => {
         toast.classList.remove('show'); sw1.classList.remove('on'); sw2.classList.remove('on');
         taps = 0; count.textContent = '';
-      }, 3600);
-      setTimeout(loop, 4200);
+      }, 4000);
+      setTimeout(loop, 4800);
       return;
     }
-    setTimeout(loop, 380);
+    setTimeout(loop, 420);
   }
-  if (reduceMotion) { count.textContent = '×7'; toast.classList.add('show'); sw1.classList.add('on'); sw2.classList.add('on'); }
+  if (reduceMotion) { count.textContent = '✓'; toast.classList.add('show'); sw1.classList.add('on'); sw2.classList.add('on'); }
   else loop();
 })();
 
-/* ---------- shortcuts: light up keys the visitor presses ---------- */
-addEventListener('keydown', (e) => {
-  const key = $$('.key').find((k) => k.dataset.key.toLowerCase() === e.key.toLowerCase());
-  if (!key) return;
-  key.classList.add('pressed');
-  setTimeout(() => key.classList.remove('pressed'), 220);
-});
-
-/* ---------- universal clipboard scene: Mac -> phone, then phone -> Mac ---------- */
+/* ---------- universal clipboard scene ---------- */
 (() => {
   const sel = $('#macSel'), chip = $('#macChip'), pill = $('#clipPill');
   const input = $('#phoneInput'), paste = $('#pasteChip'), bubble = $('#phoneBubble');
   if (!sel) return;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const text = 'https://maps.app/airdoxx-cafe';
+  const reply = 'Booked a table for 2';
 
   async function cycle() {
-    // Mac: select + ⌘C
-    sel.classList.add('on'); await wait(500);
-    chip.textContent = '⌘C'; chip.classList.add('on'); await wait(700);
+    sel.classList.add('on'); await wait(600);
+    chip.textContent = '⌘C'; chip.classList.add('on'); await wait(800);
     chip.classList.remove('on');
-    // fly to phone
-    pill.classList.remove('back', 'fly'); void pill.offsetWidth; pill.classList.add('fly'); await wait(1300);
+    pill.textContent = text;
+    pill.classList.remove('back', 'fly'); void pill.offsetWidth; pill.classList.add('fly'); await wait(1400);
     pill.classList.remove('fly'); sel.classList.remove('on');
-    // phone: Paste
-    paste.classList.add('on'); await wait(600); paste.classList.remove('on');
-    input.textContent = text; await wait(700);
-    input.textContent = ''; bubble.classList.add('on'); await wait(1600);
-    // and back: phone copy -> Mac
-    pill.textContent = '📋 Booked a table for 2 🍽️';
-    pill.classList.add('back'); void pill.offsetWidth; pill.classList.add('fly'); await wait(1300);
+    paste.classList.add('on'); await wait(700); paste.classList.remove('on');
+    input.textContent = text; await wait(800);
+    input.textContent = ''; bubble.classList.add('on'); await wait(1800);
+    pill.textContent = reply;
+    pill.classList.add('back'); void pill.offsetWidth; pill.classList.add('fly'); await wait(1400);
     pill.classList.remove('fly', 'back');
     chip.textContent = '⌘V'; chip.classList.add('on');
-    sel.textContent = 'Booked a table for 2 🍽️'; await wait(1600);
-    // reset
+    sel.textContent = reply; await wait(1800);
     chip.classList.remove('on'); bubble.classList.remove('on');
-    sel.textContent = text; pill.textContent = `📋 ${text}`;
-    await wait(900);
+    sel.textContent = text;
+    await wait(1000);
     cycle();
   }
   if (reduceMotion) { bubble.classList.add('on'); return; }
@@ -264,3 +211,16 @@ addEventListener('keydown', (e) => {
   });
   io.observe($('.clip-stage'));
 })();
+
+/* ---------- download: confirm the click ---------- */
+$$('[data-download]').forEach((a) => a.addEventListener('click', () => {
+  $('#download')?.classList.add('is-downloading');
+}));
+
+/* ---------- shortcuts: light up keys the visitor presses ---------- */
+addEventListener('keydown', (e) => {
+  const key = $$('.key').find((k) => k.dataset.key.toLowerCase() === e.key.toLowerCase());
+  if (!key) return;
+  key.classList.add('pressed');
+  setTimeout(() => key.classList.remove('pressed'), 240);
+});

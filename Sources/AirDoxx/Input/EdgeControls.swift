@@ -77,7 +77,7 @@ final class EdgeControls {
         }
         guard let cfList = createList()?.takeRetainedValue() else { return }
         deviceList = cfList
-        guard let list = cfList as? [AnyObject] else { return }
+        let list = cfList as [AnyObject]
         for item in list {
             let device = Unmanaged.passUnretained(item).toOpaque()
             register(device, edgeContactCallback)

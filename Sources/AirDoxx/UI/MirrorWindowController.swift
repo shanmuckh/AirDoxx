@@ -134,6 +134,7 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
         window.title = "AirDoxx"
         window.collectionBehavior = [.fullScreenNone]
         window.isReleasedWhenClosed = false
+        window.animationBehavior = .documentWindow   // native grow-in / shrink-out
         super.init(window: window)
         window.delegate = self
 
@@ -414,16 +415,39 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - Mirroring vs. status
 
     func showMirroring(_ mirroring: Bool) {
-        // Detach the SwiftUI status view entirely while mirroring: a hidden NSHostingView still
+        // Cross-dissolve between the "connecting" backdrop and the live phone screen.
+        // The SwiftUI status view is detached entirely while mirroring: a hidden NSHostingView still
         // won hit-testing and swallowed the second click of every double-click.
         if mirroring {
-            statusHost.removeFromSuperview()
-        } else if statusHost.superview == nil {
-            phoneFrame.addSubview(statusHost, positioned: .below, relativeTo: toastBackground)
-            layoutContent()
+            screenView.isHidden = false
+            screenView.alphaValue = 0
+            let status = statusHost
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.55
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1, 0.36, 1)
+                screenView.animator().alphaValue = 1
+                status.animator().alphaValue = 0
+            } completionHandler: {
+                status.removeFromSuperview()
+                status.alphaValue = 1
+            }
+        } else {
+            if statusHost.superview == nil {
+                phoneFrame.addSubview(statusHost, positioned: .below, relativeTo: toastBackground)
+                layoutContent()
+            }
+            statusHost.isHidden = false
+            statusHost.alphaValue = 0
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.45
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1, 0.36, 1)
+                statusHost.animator().alphaValue = 1
+                screenView.animator().alphaValue = 0
+            } completionHandler: { [weak self] in
+                self?.screenView.isHidden = true
+                self?.screenView.alphaValue = 1
+            }
         }
-        statusHost.isHidden = mirroring
-        screenView.isHidden = !mirroring
         barPinned = !mirroring
         updateBar()
         if mirroring {
@@ -441,7 +465,8 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
         let alpha: CGFloat = visible ? 1 : 0
         if animated {
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.18
+                ctx.duration = visible ? 0.28 : 0.4
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1, 0.36, 1)
                 topBar.animator().alphaValue = alpha
             } completionHandler: { [weak self] in
                 self?.window?.invalidateShadow()
@@ -460,13 +485,19 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
     func showToast(_ text: String) {
         toastLabel.stringValue = text
         toastWorkItem?.cancel()
+        // Rise 8pt while fading in; sink back while fading out.
+        let rest = toastBackground.frame.origin
+        if toastBackground.alphaValue < 0.01 { toastBackground.setFrameOrigin(NSPoint(x: rest.x, y: rest.y - 8)) }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.2
+            ctx.duration = 0.45
+            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1, 0.36, 1)
             toastBackground.animator().alphaValue = 1
+            toastBackground.animator().setFrameOrigin(rest)
         }
         let work = DispatchWorkItem { [weak self] in
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.4
+                ctx.duration = 0.5
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.65, 0, 0.35, 1)
                 self?.toastBackground.animator().alphaValue = 0
             }
         }
