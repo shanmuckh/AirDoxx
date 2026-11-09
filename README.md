@@ -4,11 +4,11 @@
 
 AirDoxx is a native macOS app that mirrors and controls an Android phone, modelled on Apple's iPhone Mirroring. It shows the phone's screen, plays its sound, forwards its notifications and shares its clipboard. You control the phone with your Mac's keyboard and trackpad, and it works wirelessly after a one-time setup.
 
-**Website and setup guide:** https://shanmuckh.github.io/AirDox/
+**Website and setup guide:** https://shanmuckh.github.io/AirDoxx/
 
 ## Download
 
-**[⬇ Download AirDoxx 2.0 for Mac](https://shanmuckh.github.io/AirDox/download/AirDoxx.dmg)**. The same file is attached to the [latest release](https://github.com/shanmuckh/AirDox/releases/latest).
+**[⬇ Download AirDoxx 2.0 for Mac](https://shanmuckh.github.io/AirDoxx/download/AirDoxx.dmg)**. The same file is attached to the [latest release](https://github.com/shanmuckh/AirDoxx/releases/latest).
 
 The app is universal (Apple silicon and Intel) and needs macOS 14 Sonoma or later.
 
@@ -30,7 +30,7 @@ The app is universal (Apple silicon and Intel) and needs macOS 14 Sonoma or late
   - if Wireless debugging is off, it tells you to turn it back on
 - **New website:** black and white, and Download now downloads the DMG straight from the site.
 
-The previous version is kept on the [`v1` branch](https://github.com/shanmuckh/AirDox/tree/v1).
+The previous version is kept on the [`v1` branch](https://github.com/shanmuckh/AirDoxx/tree/v1).
 
 ## Features
 

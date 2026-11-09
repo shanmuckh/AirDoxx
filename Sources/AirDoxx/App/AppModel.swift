@@ -22,8 +22,8 @@ enum Presentation: Equatable {
 }
 
 enum AirDoxxLinks {
-    static let website = URL(string: "https://shanmuckh.github.io/AirDox/")!
-    static let setupGuide = URL(string: "https://shanmuckh.github.io/AirDox/#setup")!
+    static let website = URL(string: "https://shanmuckh.github.io/AirDoxx/")!
+    static let setupGuide = URL(string: "https://shanmuckh.github.io/AirDoxx/#setup")!
 }
 
 enum StreamQuality: String, CaseIterable {
