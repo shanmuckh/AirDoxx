@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     let keyInterceptor = MacKeyInterceptor()
     var hub: HubWindowController!
     private var presentationObserver: AnyCancellable?
+    fileprivate var switchPhoneMenu: NSMenu?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppMover.offerMoveIfNeeded()
@@ -16,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         windowController.onToggleScreenMode = { [weak self] in self?.model.toggleScreenMode() }
         windowController.onRotate = { [weak self] in self?.model.rotatePhone() }
         windowController.onDisconnect = { [weak self] in self?.model.disconnect() }
+        windowController.onToggleRecord = { [weak self] in self?.model.toggleRecording() }
+        windowController.onTogglePin = { [weak self] in self?.model.toggleOnTop() }
         windowController.onForget = { [weak self] in self?.model.forgetPhone() }
         windowController.updateScreenModeButton(macOnly: model.turnScreenOff)
         windowController.showMirroring(false)
@@ -176,6 +179,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "About AirDoxx", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
+        appMenu.addItem(item("Keyboard Shortcuts…", #selector(showShortcuts), ","))
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide AirDoxx", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
@@ -189,7 +194,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         file.addItem(item("Connect Over Wi-Fi Automatically", #selector(toggleAutoWireless), ""))
         file.addItem(item("Set Up or Pair a Phone…", #selector(setUpPhone), "n"))
         file.addItem(item("Pair with Code…", #selector(showWireless), "k"))
-        file.addItem(item("Disconnect", #selector(disconnect), "d", [.command, .shift]))
+        let phones = NSMenu(title: "Switch Phone")
+        phones.delegate = self
+        phones.autoenablesItems = false
+        switchPhoneMenu = phones
+        file.addItem(submenu(phones, title: "Switch Phone"))
+        file.addItem(sc("nextPhone", "Connection", item("Switch to Next Phone", #selector(nextPhone), "n", [.command, .option])))
+        file.addItem(.separator())
+        file.addItem(sc("disconnect", "Connection", item("Disconnect", #selector(disconnect), "d", [.command, .shift])))
         file.addItem(item("Disconnect Permanently…", #selector(forgetPhone), ""))
         file.addItem(item("Universal Clipboard", #selector(toggleClipboard), ""))
         file.addItem(.separator())
@@ -210,9 +222,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let view = NSMenu(title: "View")
         view.addItem(item("Trackpad Edge Controls for Mac", #selector(toggleEdgeControls), ""))
         view.addItem(.separator())
-        view.addItem(item("Larger", #selector(larger), "+"))
-        view.addItem(item("Actual Size", #selector(actualSize), "0"))
-        view.addItem(item("Smaller", #selector(smaller), "-"))
+        view.addItem(sc("larger", "Window", item("Larger", #selector(larger), "+")))
+        view.addItem(sc("actualSize", "Window", item("Actual Size", #selector(actualSize), "0")))
+        view.addItem(sc("smaller", "Window", item("Smaller", #selector(smaller), "-")))
         view.addItem(.separator())
         let quality = NSMenu(title: "Quality")
         for q in StreamQuality.allCases {
@@ -225,22 +237,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         // Phone
         let phone = NSMenu(title: "Phone")
-        phone.addItem(item("Home Screen", #selector(home), "1"))
-        phone.addItem(item("App Switcher", #selector(recents), "2"))
-        phone.addItem(item("Notifications", #selector(notifications), "3"))
-        phone.addItem(item("Quick Settings", #selector(quickSettings), "4"))
-        phone.addItem(item("Back", #selector(back), "["))
+        phone.addItem(sc("home", "Phone", item("Home Screen", #selector(home), "1")))
+        phone.addItem(sc("recents", "Phone", item("App Switcher", #selector(recents), "2")))
+        phone.addItem(sc("notifications", "Phone", item("Notifications", #selector(notifications), "3")))
+        phone.addItem(sc("quickSettings", "Phone", item("Quick Settings", #selector(quickSettings), "4")))
+        phone.addItem(sc("back", "Phone", item("Back", #selector(back), "[")))
         phone.addItem(.separator())
-        phone.addItem(item("Volume Up", #selector(volumeUp), String(UnicodeScalar(NSUpArrowFunctionKey)!)))
-        phone.addItem(item("Volume Down", #selector(volumeDown), String(UnicodeScalar(NSDownArrowFunctionKey)!)))
-        phone.addItem(item("Rotate", #selector(rotate), "r"))
-        phone.addItem(item("Lock / Power Button", #selector(power), "l"))
+        phone.addItem(sc("volumeUp", "Phone", item("Volume Up", #selector(volumeUp), String(UnicodeScalar(NSUpArrowFunctionKey)!))))
+        phone.addItem(sc("volumeDown", "Phone", item("Volume Down", #selector(volumeDown), String(UnicodeScalar(NSDownArrowFunctionKey)!))))
+        phone.addItem(sc("rotate", "Phone", item("Rotate", #selector(rotate), "r")))
+        phone.addItem(sc("power", "Phone", item("Lock / Power Button", #selector(power), "l")))
         phone.addItem(.separator())
         phone.addItem(.separator())
-        phone.addItem(item("Do Not Disturb On/Off", #selector(toggleDND), "d", [.command, .option]))
-        phone.addItem(item("Take Screenshot", #selector(screenshot), "s", [.command, .shift]))
+        phone.addItem(sc("dnd", "Phone", item("Do Not Disturb On/Off", #selector(toggleDND), "d", [.command, .option])))
+        phone.addItem(sc("screenshot", "Capture", item("Take Screenshot", #selector(screenshot), "s", [.command, .shift])))
+        phone.addItem(sc("record", "Capture", item("Record Screen", #selector(toggleRecord), "r", [.command, .shift])))
         phone.addItem(.separator())
-        phone.addItem(item("Show on Mac Only (Phone Screen Off)", #selector(toggleScreenOffSetting), "p", [.command, .shift]))
+        phone.addItem(sc("pin", "Window", item("Keep Window on Top", #selector(togglePin), "t", [.command, .shift])))
+        phone.addItem(item("Copy Verification Codes Automatically", #selector(toggleCopyCodes), ""))
+        phone.addItem(.separator())
+        phone.addItem(sc("screenMode", "Window", item("Show on Mac Only (Phone Screen Off)", #selector(toggleScreenOffSetting), "p", [.command, .shift])))
         phone.addItem(item("Play Phone Audio on Mac", #selector(toggleAudio), ""))
         phone.addItem(item("Permissions…", #selector(requestMacKeys), ""))
         phone.addItem(item("Send Test Notification", #selector(testNotification), ""))
@@ -260,6 +276,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         main.addItem(submenu(help, title: "Help"))
 
         return main
+    }
+
+    /// Marks a menu item's shortcut as customisable (AirDoxx › Keyboard Shortcuts…).
+    private func sc(_ id: String, _ group: String, _ item: NSMenuItem) -> NSMenuItem {
+        ShortcutStore.shared.register(id, item, group: group)
     }
 
     private func submenu(_ menu: NSMenu, title: String) -> NSMenuItem {
@@ -288,14 +309,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         case #selector(toggleEdgeControls):
             menuItem.state = edgeControlsEnabled && EdgeControls.shared.isRunning ? .on : (edgeControlsEnabled ? .mixed : .off)
             return true
+        case #selector(toggleRecord):
+            menuItem.title = model.isRecording ? "Stop Recording" : "Record Screen"
+            return model.isMirroring
+        case #selector(togglePin):
+            menuItem.state = model.isOnTop ? .on : .off
+            return model.isMirroring
+        case #selector(toggleCopyCodes):
+            menuItem.state = model.copyCodes ? .on : .off
+            return true
         case #selector(toggleClipboard):
             menuItem.state = model.universalClipboard ? .on : .off
             return true
         case #selector(toggleAutoWireless):
             menuItem.state = model.autoWireless ? .on : .off
             return true
-        case #selector(requestMacKeys):
+        case #selector(requestMacKeys), #selector(showShortcuts), #selector(nextPhone):
             return true
+        case #selector(switchPhone(_:)):
+            return menuItem.representedObject != nil
         case #selector(toggleAudio):
             menuItem.state = model.audioEnabled ? .on : .off
             return true
@@ -308,6 +340,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     // MARK: - Actions
 
+    @objc private func showShortcuts() { ShortcutsWindowController.shared.show() }
+    @objc private func nextPhone() { model.switchToNextPhone() }
+    @objc private func switchPhone(_ sender: NSMenuItem) {
+        guard let serial = sender.representedObject as? String,
+              let device = model.devices.first(where: { $0.serial == serial }) else { return }
+        model.switchPhone(to: device)
+    }
     @objc private func showWireless() { model.showWirelessSheet() }
     @objc private func disconnect() { model.disconnect() }
     @objc private func forgetPhone() { model.forgetPhone() }
@@ -331,8 +370,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func rotate() { model.rotatePhone() }
     @objc private func power() { model.pressKey(AndroidKey.power) }
     @objc private func screenshot() { model.takeScreenshot() }
+    @objc private func toggleRecord() { model.toggleRecording() }
+    @objc private func togglePin() { model.toggleOnTop() }
+    @objc private func toggleCopyCodes() { model.copyCodes.toggle() }
     @objc private func toggleScreenOffSetting() { model.turnScreenOff.toggle() }
     @objc private func toggleAudio() { model.audioEnabled.toggle() }
     @objc private func toggleDND() { model.toggleDoNotDisturb() }
     @objc private func toggleAutoWireless() { model.autoWireless.toggle() }
+}
+
+// MARK: - Switch Phone menu
+
+extension AppDelegate: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu === switchPhoneMenu else { return }
+        menu.removeAllItems()
+        let choices = model.phoneChoices()
+        if choices.isEmpty {
+            let none = NSMenuItem(title: "No Phones Yet", action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            menu.addItem(none)
+        }
+        for choice in choices {
+            let title = choice.device == nil ? "\(choice.name) – not connected" : choice.name
+            let i = NSMenuItem(title: title, action: #selector(switchPhone(_:)), keyEquivalent: "")
+            i.target = self
+            i.representedObject = choice.device?.serial
+            i.state = choice.isCurrent ? .on : .off
+            i.isEnabled = choice.device != nil
+            menu.addItem(i)
+        }
+        menu.addItem(.separator())
+        let add = NSMenuItem(title: "Add Another Phone…", action: #selector(setUpPhone), keyEquivalent: "")
+        add.target = self
+        menu.addItem(add)
+    }
 }

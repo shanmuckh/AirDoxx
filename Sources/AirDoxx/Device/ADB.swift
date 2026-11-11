@@ -109,7 +109,7 @@ final class ADB {
 
     struct MDNSService {
         let name: String     // e.g. "adb-a48f29af-Xy12Ab" or the QR pairing name
-        let type: String     // "_adb-tls-connect._tcp" / "_adb-tls-pairing._tcp"
+        let type: String     // "_adb-tls-connect._tcp" / "_adb-tls-pairing._tcp" / "_adb._tcp"
         let address: String  // "ip:port"
 
         /// Hardware serial embedded in adb's service name ("adb-<serial>-<suffix>").
@@ -126,7 +126,7 @@ final class ADB {
         guard let out = try? run(["mdns", "services"], timeout: 5) else { return [] }
         return out.split(separator: "\n").compactMap { line in
             let parts = line.split(whereSeparator: { $0 == "\t" || $0 == " " }).map(String.init)
-            guard parts.count >= 3, parts[1].hasPrefix("_adb-tls") else { return nil }
+            guard parts.count >= 3, parts[1].hasPrefix("_adb") else { return nil }
             return MDNSService(name: parts[0], type: parts[1].trimmingCharacters(in: CharacterSet(charactersIn: ".")),
                                address: parts[2])
         }

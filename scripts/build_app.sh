@@ -5,8 +5,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="AirDoxx"
-APP_VERSION="2.0.0"
-BUILD_NUMBER="2"
+APP_VERSION="2.3.0"
+BUILD_NUMBER="5"
 MODE="${1:-}"   # "", "--install" or "--release"
 APP="build/$APP_NAME.app"
 CONTENTS="$APP/Contents"

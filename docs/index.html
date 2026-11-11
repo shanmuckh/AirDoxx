@@ -28,7 +28,7 @@
   <main id="top">
     <!-- ============ HERO (black) ============ -->
     <section class="hero dark">
-      <p class="kicker reveal">AirDoxx 2.0 · for macOS</p>
+      <p class="kicker reveal"><a class="kicker-new" href="#new"><b>New</b> AirDoxx 2.3 – follows you between Wi‑Fi networks <span aria-hidden="true">→</span></a></p>
       <h1 class="hero-title" aria-label="Your Android. On your Mac.">
         <span class="line"><span class="word">Your</span> <span class="word">Android.</span></span>
         <span class="line muted"><span class="word">On</span> <span class="word">your</span> <span class="word">Mac.</span></span>
@@ -38,6 +38,9 @@
         <a class="pill pill-light magnetic" href="download/AirDoxx.dmg" download data-download><span>Download for Mac</span></a>
         <a class="pill pill-ghost magnetic" href="#setup"><span>How it works</span></a>
       </div>
+      <button type="button" class="one-liner reveal" data-copy="curl -fsSL https://shanmuckh.github.io/AirDoxx/install.sh | bash" aria-label="Copy the Terminal install command">
+        <span class="prompt" aria-hidden="true">$</span><code>curl -fsSL shanmuckh.github.io/AirDoxx/install.sh | bash</code><span class="one-liner-hint">Copy</span>
+      </button>
       <p class="meta reveal">Free · Universal · macOS 14 or later</p>
 
       <div class="stage" aria-hidden="true">
@@ -136,11 +139,59 @@
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
           <h3>Lock‑screen aware</h3><p>The phone wakes for its fingerprint, or type the PIN here.</p>
         </article>
+        <article class="tile tilt reveal">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7.5 12h.01M12 12h.01M16.5 12h.01"/></svg>
+          <h3>Codes copy themselves</h3><p>A one‑time code arrives on the phone. It's already on your Mac's clipboard.</p>
+        </article>
+        <article class="tile tilt reveal">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="8" width="17" height="9" rx="2"/><path d="M22 11v3M5.5 11v3M9 11v3"/></svg>
+          <h3>Battery &amp; signal</h3><p>The phone's charge and Wi‑Fi, right in the title bar.</p>
+        </article>
+        <article class="tile tilt reveal">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>
+          <h3>Record</h3><p>Capture the phone's screen straight to Movies. ⇧⌘R.</p>
+        </article>
+        <article class="tile tilt reveal">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5M8 3h8l-1 6 3 4H6l3-4z"/></svg>
+          <h3>Stay on top</h3><p>Pin the phone above every other window. ⇧⌘T.</p>
+        </article>
+        <article class="tile tilt reveal">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9M2 19h20"/></svg>
+          <h3>Close the lid</h3><p>The phone gets its screen back. Open it – AirDoxx is connected again.</p>
+        </article>
+        <article class="tile span2 tilt reveal">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="8" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2"/></svg>
+          <h3>More than one phone</h3>
+          <p>AirDoxx remembers every phone you set up. Pick one from the Switch Phone menu, or press ⌥⌘N to jump to the next.</p>
+        </article>
+        <article class="tile span2 tilt reveal">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h2M11 10h2M16 10h2M7 14h10"/></svg>
+          <h3>Your shortcuts</h3>
+          <p>Home, Back, Rotate, Record and the rest – give each one the keys you like in Keyboard Shortcuts (⌘,).</p>
+        </article>
         <article class="tile span2 tilt reveal">
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
           <h3>Drop files. Install apps.</h3>
           <p>Drop a photo onto the phone to save it to Downloads. Drop an APK to install it. ⇧⌘S saves a screenshot.</p>
         </article>
+      </div>
+    </section>
+
+    <!-- ============ NEW (white) ============ -->
+    <section class="whatsnew light" id="new">
+      <p class="eyebrow reveal">New in 2.3</p>
+      <h2 class="section-title reveal">It goes where you go.</h2>
+      <div class="journey reveal" aria-hidden="true">
+        <div class="stop"><i></i><span>Home Wi‑Fi</span></div>
+        <div class="track"><b></b></div>
+        <div class="stop"><i></i><span>On the way</span></div>
+        <div class="track"><b></b></div>
+        <div class="stop"><i></i><span>Campus Wi‑Fi</span></div>
+      </div>
+      <div class="new-cols">
+        <div class="reveal"><span class="num">01</span><h3>Change networks</h3><p>Android switches Wireless debugging off whenever the phone leaves its Wi‑Fi. AirDoxx now keeps its own link that survives the trip and finds the phone at its new address.</p></div>
+        <div class="reveal"><span class="num">02</span><h3>Close the lid</h3><p>Shut your Mac and the phone lights back up, ready to use. Open the Mac and mirroring picks up by itself.</p></div>
+        <div class="reveal"><span class="num">03</span><h3>One‑line install</h3><p>A single Terminal command downloads, installs and opens AirDoxx – with no security warning to click through.</p></div>
       </div>
     </section>
 
@@ -201,13 +252,34 @@
     <section class="download light" id="download">
       <img class="dl-icon reveal" src="assets/icon.png?v=3" alt="AirDoxx icon" width="140" height="140">
       <h2 class="section-title reveal">Get AirDoxx.</h2>
-      <p class="sub reveal">Version 2.0 · Free · Apple silicon &amp; Intel · macOS 14 or later</p>
-      <a class="pill pill-dark pill-lg magnetic reveal" href="download/AirDoxx.dmg" download data-download><span>Download AirDoxx.dmg</span></a>
-      <ol class="install reveal">
-        <li><span>1</span><div><b>Open the download.</b> A window shows AirDoxx and your Applications folder.</div></li>
-        <li><span>2</span><div><b>Drag AirDoxx into Applications.</b> Or just open it – it offers to move itself.</div></li>
-        <li><span>3</span><div><b>First launch only:</b> macOS asks to confirm an app from the internet. If it says it can't verify AirDoxx, click <b>Done</b>, then <b>System Settings › Privacy &amp; Security › Open Anyway</b>.</div></li>
-      </ol>
+      <p class="sub reveal">Version 2.3 · Free · Apple silicon &amp; Intel · macOS 14 or later</p>
+      <div class="dl-tabs reveal" role="tablist">
+        <button class="dl-tab active" data-tab="download" role="tab">Download</button>
+        <button class="dl-tab" data-tab="terminal" role="tab">Install via Terminal</button>
+      </div>
+
+      <div class="dl-panel reveal" data-panel="download">
+        <a class="pill pill-dark pill-lg magnetic" href="download/AirDoxx.dmg" download data-download><span>Download AirDoxx.dmg</span></a>
+        <ol class="install">
+          <li><span>1</span><div><b>Open the download.</b> A window shows AirDoxx and your Applications folder.</div></li>
+          <li><span>2</span><div><b>Drag AirDoxx into Applications.</b> Or just open it – it offers to move itself.</div></li>
+          <li><span>3</span><div><b>First launch only:</b> if macOS says it can't verify AirDoxx, click <b>Done</b>, then open <b>System Settings › Privacy &amp; Security</b> and click <b>Open Anyway</b>. Once only.</div></li>
+        </ol>
+      </div>
+
+      <div class="dl-panel" data-panel="terminal" hidden>
+        <p class="term-intro">The quickest way, and macOS never shows the "can't verify" warning. Paste this one line into <b>Terminal</b>:</p>
+        <div class="term">
+          <div class="term-bar"><i></i><i></i><i></i><span>Terminal</span><button type="button" class="term-copy" id="termCopy">Copy</button></div>
+          <pre><code id="termCmd">curl -fsSL https://shanmuckh.github.io/AirDoxx/install.sh | bash</code></pre>
+        </div>
+        <ul class="term-steps">
+          <li><b>Downloads</b> the same AirDoxx.dmg as the button</li>
+          <li><b>Copies</b> AirDoxx into Applications</li>
+          <li><b>Opens</b> it. No password, nothing runs as admin</li>
+        </ul>
+        <p class="fine">Run it again any time to update. <a href="install.sh">Read the script</a> first if you like – it's 50 lines.</p>
+      </div>
       <p class="fine reveal">Android 8+ on the phone (sound and QR pairing need Android 11+). <a href="https://github.com/shanmuckh/AirDoxx">Source code</a></p>
     </section>
 
@@ -256,6 +328,8 @@ cd AirDox &amp;&amp; ./scripts/build_app.sh --install</code></pre></details></di
         <div class="key" data-key="p"><kbd>⇧⌘P</kbd><span>Screens</span></div>
         <div class="key" data-key="Escape"><kbd>esc</kbd><span>Back</span></div>
         <div class="key" data-key="d"><kbd>⌥⌘D</kbd><span>Do Not Disturb</span></div>
+        <div class="key" data-key="n"><kbd>⌥⌘N</kbd><span>Next phone</span></div>
+        <div class="key" data-key=","><kbd>⌘,</kbd><span>Change these</span></div>
       </div>
     </section>
 
@@ -265,9 +339,12 @@ cd AirDox &amp;&amp; ./scripts/build_app.sh --install</code></pre></details></di
       <div class="faq-list">
         <details class="reveal"><summary>Do I install anything on the phone?</summary><p>No. AirDoxx uses Android's built‑in developer connection. Its small helper runs only while you mirror and leaves nothing behind.</p></details>
         <details class="reveal"><summary>Why Developer options?</summary><p>Capturing the screen and simulating touches from a computer is only allowed through Android's debugging interface – the same one Android Studio uses.</p></details>
-        <details class="reveal"><summary>Will I have to pair again?</summary><p>No. Once paired, AirDoxx reconnects by itself on the same Wi‑Fi. After the phone restarts, turn Wireless debugging back on (or plug in once).</p></details>
+        <details class="reveal"><summary>Will I have to pair again?</summary><p>No. Once paired, AirDoxx reconnects by itself. After the phone restarts, turn Wireless debugging back on once (or plug in once).</p></details>
+        <details class="reveal"><summary>What if I change Wi‑Fi, like home to college?</summary><p>AirDoxx keeps its own link to the phone that survives changing networks, and finds the phone again at its new address. Some campus and office networks stop devices from talking to each other; there, turn on your phone's hotspot and join it from the Mac.</p></details>
+        <details class="reveal"><summary>Can I use more than one phone?</summary><p>Yes. Set each one up once, then choose it under <b>Connection › Switch Phone</b>. AirDoxx mirrors one phone at a time and goes back to the last one you used.</p></details>
+        <details class="reveal"><summary>What happens when I close the Mac's lid?</summary><p>Your phone gets its screen back straight away. Open the lid and AirDoxx reconnects by itself.</p></details>
         <details class="reveal"><summary>Why is GPay or my bank app black?</summary><p>Payment and banking apps hide their screens from every kind of screen capture. AirDoxx tells you and switches the phone's screen on so you can finish there.</p></details>
-        <details class="reveal"><summary>macOS says it can't verify AirDoxx.</summary><p>AirDoxx isn't notarized by Apple yet. Click <b>Done</b>, then <b>System Settings › Privacy &amp; Security › Open Anyway</b>. Once only. The source is public.</p></details>
+        <details class="reveal"><summary>macOS says it can't verify AirDoxx.</summary><p>AirDoxx isn't notarized by Apple yet. Use <b>Install via Terminal</b> above and the warning never appears. Or click <b>Done</b>, then <b>System Settings › Privacy &amp; Security › Open Anyway</b>. Once only. The source is public.</p></details>
         <details class="reveal"><summary>Is it private?</summary><p>Everything stays between your phone and your Mac on your own network. Nothing is uploaded.</p></details>
       </div>
     </section>

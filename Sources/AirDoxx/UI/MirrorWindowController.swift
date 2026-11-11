@@ -12,6 +12,7 @@ final class MirrorWindow: NSWindow {
 final class TopBarView: NSView {
     let background = NSVisualEffectView()
     let buttonStack = NSStackView()
+    let statusLabel = NSTextField(labelWithString: "")
     var trafficLights: [NSButton] = []
 
     override init(frame: NSRect) {
@@ -38,6 +39,12 @@ final class TopBarView: NSView {
         buttonStack.orientation = .horizontal
         buttonStack.spacing = 2
         addSubview(buttonStack)
+
+        statusLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        statusLabel.textColor = .secondaryLabelColor
+        statusLabel.alignment = .center
+        statusLabel.lineBreakMode = .byTruncatingTail
+        addSubview(statusLabel)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -71,6 +78,8 @@ final class TopBarView: NSView {
         let stackSize = buttonStack.fittingSize
         buttonStack.frame = NSRect(x: bounds.width - stackSize.width - 8, y: bar.midY - stackSize.height / 2,
                                    width: stackSize.width, height: stackSize.height)
+        let leftEdge = x, rightEdge = buttonStack.frame.minX - 6
+        statusLabel.frame = NSRect(x: leftEdge, y: bar.midY - 8, width: max(0, rightEdge - leftEdge), height: 16)
     }
 
     override var mouseDownCanMoveWindow: Bool { true }
@@ -213,6 +222,10 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
                                             action: #selector(screenModePressed))
         topBar.addButton(symbol: "rotate.right", tooltip: "Rotate: portrait / landscape (⌘R)", target: self,
                          action: #selector(rotatePressed))
+        recordButton = topBar.addButton(symbol: "record.circle", tooltip: "Record screen", target: self,
+                                        action: #selector(recordPressed))
+        pinButton = topBar.addButton(symbol: "pin", tooltip: "Keep window on top", target: self,
+                                     action: #selector(pinPressed))
         topBar.addButton(symbol: "chevron.backward", tooltip: "Back", target: self, action: #selector(backPressed))
         topBar.addButton(symbol: "house", tooltip: "Home Screen (⌘1)", target: self, action: #selector(homePressed))
         topBar.addButton(symbol: "square.on.square", tooltip: "App Switcher (⌘2)", target: self, action: #selector(recentsPressed))
@@ -243,6 +256,36 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func menuDisconnect() { onDisconnect?() }
     @objc private func menuForget() { onForget?() }
+
+    // --- Record ---
+    var onToggleRecord: (() -> Void)?
+    private var recordButton: NSButton?
+    @objc private func recordPressed() { onToggleRecord?() }
+    func updateRecordButton(recording: Bool) {
+        recordButton?.image = NSImage(systemSymbolName: recording ? "stop.circle.fill" : "record.circle",
+                                      accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
+        recordButton?.contentTintColor = recording ? .systemRed : .labelColor
+        recordButton?.toolTip = recording ? "Stop recording" : "Record screen"
+    }
+
+    // --- Keep on top ---
+    var onTogglePin: (() -> Void)?
+    private var pinButton: NSButton?
+    @objc private func pinPressed() { onTogglePin?() }
+    func updatePinButton(onTop: Bool) {
+        window?.level = onTop ? .floating : .normal
+        pinButton?.image = NSImage(systemSymbolName: onTop ? "pin.fill" : "pin", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
+        pinButton?.contentTintColor = onTop ? .controlAccentColor : .labelColor
+        pinButton?.toolTip = onTop ? "On top – click to stop" : "Keep window on top"
+    }
+
+    /// Battery / signal text in the toolbar centre.
+    func updateStatus(_ text: String) {
+        topBar.statusLabel.stringValue = text
+        topBar.needsLayout = true
+    }
 
     var onToggleScreenMode: (() -> Void)?
     var onRotate: (() -> Void)?

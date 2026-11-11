@@ -89,6 +89,10 @@ final class MirrorSession {
                 self.debugLog("control: sent type \(message.first ?? 255)\(detail)")
             } catch {
                 self.debugLog("control: write failed: \(error)")
+                // The control channel is gone: the session is dead even if video hasn't noticed.
+                if !self.isStopped {
+                    DispatchQueue.global().async { self.finish("The connection to the phone was lost.") }
+                }
             }
         }
     }
@@ -136,7 +140,11 @@ final class MirrorSession {
         screenOffTimer = timer
     }
 
+    /// The server rejects clipboard messages above 256 KB.
+    static let clipboardMaxBytes = 200_000
+
     func setClipboard(_ text: String, paste: Bool) {
+        guard text.utf8.count <= Self.clipboardMaxBytes else { return }
         let seq = clipboardSequence
         clipboardSequence += 1
         send(ControlMessage.setClipboard(sequence: seq, paste: paste, text: text))
@@ -369,7 +377,7 @@ final class MirrorSession {
             }
             let ptsAndFlags = header.beU64(at: 0)
             let length = Int(header.beU32(at: 8))
-            guard length > 0 else { throw ADBError(message: "Invalid video packet.") }
+            guard length > 0, length <= 64_000_000 else { throw ADBError(message: "Invalid video packet.") }
             let payload = try socket.readFully(length)
 
             let isConfig = ptsAndFlags & (1 << 62) != 0
@@ -409,7 +417,7 @@ final class MirrorSession {
                     let header = try socket.readFully(12)
                     let flags = header.beU64(at: 0)
                     let length = Int(header.beU32(at: 8))
-                    guard length > 0 else { return }
+                    guard length > 0, length <= 8_000_000 else { return }
                     let payload = try socket.readFully(length)
                     if flags & (1 << 62) != 0 { continue } // config packet
                     player.enqueue(payload)
@@ -432,6 +440,7 @@ final class MirrorSession {
                     switch type {
                     case 0: // clipboard
                         let length = Int(try socket.readU32())
+                        guard length <= 8_000_000 else { return }
                         let text = String(decoding: try socket.readFully(length), as: UTF8.self)
                         guard let self else { return }
                         DispatchQueue.main.async { self.delegate?.session(self, didReceiveClipboard: text) }

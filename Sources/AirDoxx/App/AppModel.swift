@@ -76,6 +76,10 @@ final class AppModel: NSObject, ObservableObject {
     private var wirelessAttempted = Set<String>()
     private var reconnectAttempts = 0
     private let nowPlaying = NowPlayingBridge()
+    private var phoneStatus: PhoneStatus?
+    private var recorder: ScreenRecorder?
+    private(set) var isRecording = false
+    private(set) var isOnTop = false
     private var secureMonitor: SecureScreenMonitor?
     private let work = DispatchQueue(label: "app.adb", qos: .userInitiated)
     private let defaults = UserDefaults.standard
@@ -173,6 +177,60 @@ final class AppModel: NSObject, ObservableObject {
         }
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in self?.poll() }
         poll()
+        let ws = NSWorkspace.shared.notificationCenter
+        ws.addObserver(self, selector: #selector(macWillSleep), name: NSWorkspace.willSleepNotification, object: nil)
+        ws.addObserver(self, selector: #selector(macDidWake), name: NSWorkspace.didWakeNotification, object: nil)
+    }
+
+    // MARK: - Sleep / wake (lid closed, lid opened)
+
+    private var resumeAfterWake = false
+
+    /// Lid closed: stop mirroring so the phone gets its own screen back, and remember to resume.
+    @objc private func macWillSleep() {
+        guard let s = session else {
+            resumeAfterWake = autoConnect && isLookingForDevices
+            return
+        }
+        resumeAfterWake = true
+        restoreRotationIfNeeded(wait: true)
+        lastDevice = s.device
+        s.stop()            // turns the phone's display back on if we had it off
+        endSession(s)
+        state = .searching
+    }
+
+    /// Lid opened: find the phone again (it may be on a different Wi-Fi now) and carry on.
+    @objc private func macDidWake() {
+        guard resumeAfterWake else { return }
+        resumeAfterWake = false
+        let stale = devices.filter(\.isWireless).map(\.serial)
+        work.async {
+            // Connections from before sleep are dead; drop them so they're made afresh.
+            for serial in stale { _ = try? ADB.shared.run(["disconnect", serial], timeout: 4) }
+        }
+        if case .unavailable = presentation { presentation = .phone }
+        retry()
+        // Wi-Fi needs a moment after waking: be patient before saying the phone is unavailable.
+        searchStartedAt = Date().addingTimeInterval(18)
+    }
+
+    /// The Mac's default gateway. When the Mac is on the phone's hotspot, that's the phone.
+    private static func defaultGateway() -> String? {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/sbin/route")
+        p.arguments = ["-n", "get", "default"]
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t.hasPrefix("gateway:") { return t.dropFirst(8).trimmingCharacters(in: .whitespaces) }
+        }
+        return nil
     }
 
     func shutdown() {
@@ -254,6 +312,11 @@ final class AppModel: NSObject, ObservableObject {
         polling = true
         mdnsTick += 1
         let discover = mdnsTick % 3 == 1
+        // Places this phone has been reachable before (most recent first).
+        var saved = lastWirelessAddress.map { [$0] } ?? []
+        saved += wirelessMap.keys.filter { $0.hasSuffix(":5555") && !saved.contains($0) }.sorted().prefix(3)
+        let knownHardware = Set(wirelessMap.values)
+        let tryGateway = mdnsTick % 6 == 1 && !saved.isEmpty
         work.async { [weak self] in
             // Phones paired via Wireless debugging advertise themselves on the network:
             // connect to them automatically (no pairing again, no cable).
@@ -268,6 +331,27 @@ final class AppModel: NSObject, ObservableObject {
                         // The phone is advertising Wireless debugging but rejects this Mac's key:
                         // it was only temporarily trusted. It needs to be paired (once, for good).
                         DispatchQueue.main.async { self?.phoneNeedsPairing() }
+                    }
+                }
+                // Phones in Wi-Fi adb mode (port 5555) keep listening when the Wi-Fi network
+                // changes, unlike Wireless debugging. Find them at their new address.
+                var now = (try? ADB.shared.devices()) ?? []
+                if !now.contains(where: \.isReady) {
+                    for svc in ADB.shared.mdnsServices() where svc.type.hasPrefix("_adb._tcp") {
+                        if let hw = svc.hardwareSerial ?? Optional(String(svc.name.dropFirst(4))),
+                           skip.contains(hw) || (!knownHardware.isEmpty && !knownHardware.contains(hw)) { continue }
+                        _ = try? ADB.shared.run(["connect", svc.address], timeout: 4)
+                    }
+                    now = (try? ADB.shared.devices()) ?? []
+                }
+                if !now.contains(where: \.isReady) {
+                    let listed = Set(now.map(\.serial))
+                    for address in saved where !listed.contains(address) {
+                        _ = try? ADB.shared.run(["connect", address], timeout: 3)
+                    }
+                    // On the phone's own hotspot, the phone is the gateway.
+                    if tryGateway, let gw = Self.defaultGateway(), !saved.contains("\(gw):5555") {
+                        _ = try? ADB.shared.run(["connect", "\(gw):5555"], timeout: 3)
                     }
                 }
             }
@@ -310,6 +394,10 @@ final class AppModel: NSObject, ObservableObject {
         }
         if ready.count == 1, autoConnect {
             startMirroring(ready[0])
+        } else if ready.count > 1, autoConnect, let preferred = preferredPhone,
+                  let device = ready.first(where: { hardwareSerial(of: $0) == preferred }) {
+            // Several phones around: carry on with the one used last.
+            startMirroring(device)
         } else if !ready.isEmpty {
             if state != .choose(ready) { state = .choose(ready) }
         } else if let locked = found.first(where: \.isUnauthorized) {
@@ -320,10 +408,10 @@ final class AppModel: NSObject, ObservableObject {
     }
 
     /// One phone can appear several times (USB, Wi-Fi 5555, Wireless debugging). Keep one entry
-    /// per phone, preferring Wireless debugging, then Wi-Fi, then USB.
+    /// per phone, preferring Wi-Fi adb (survives network changes), then Wireless debugging, then USB.
     private func dedupe(_ ready: [ADBDevice]) -> [ADBDevice] {
         func rank(_ d: ADBDevice) -> Int {
-            d.serial.contains("._adb-tls-connect") ? 0 : (d.isWireless ? 1 : 2)
+            d.serial.hasSuffix(":5555") ? 0 : (d.isWireless ? 1 : 2)
         }
         var best: [String: ADBDevice] = [:]
         var order: [String] = []
@@ -382,20 +470,30 @@ final class AppModel: NSObject, ObservableObject {
     // MARK: - Sessions
 
     /// Auto-connect path: moves a USB phone to Wi-Fi first (once per run) when enabled.
+    /// Also moves a Wireless-debugging phone to Wi-Fi adb (port 5555): Android switches Wireless
+    /// debugging off whenever the phone leaves its Wi-Fi, but port 5555 keeps listening until the
+    /// phone restarts, so the phone can be found again at college, on a hotspot, and back home.
     private func startMirroring(_ device: ADBDevice) {
-        guard autoWireless, !device.isWireless, !wirelessAttempted.contains(device.serial) else {
+        let hw = hardwareSerial(of: device)
+        guard autoWireless, !device.serial.hasSuffix(":5555"), !wirelessAttempted.contains(hw) else {
             connect(device)
             return
         }
-        wirelessAttempted.insert(device.serial)
-        state = .connecting("\(device.displayName) over Wi-Fi")
+        wirelessAttempted.insert(hw)
+        let wasWireless = device.isWireless
+        state = .connecting(wasWireless ? device.displayName : "\(device.displayName) over Wi-Fi")
         enableWireless(for: device) { [weak self] address, message in
             guard let self else { return }
             if let address {
                 self.pendingWirelessSerial = address
                 self.state = .searching
                 self.poll()
-                self.pendingToast = "Wireless – you can unplug the cable"
+                if !wasWireless { self.pendingToast = "Wireless – you can unplug the cable" }
+            } else if wasWireless {
+                // adbd may have restarted; let discovery pick the phone up again.
+                self.searchStartedAt = Date()
+                self.state = .searching
+                self.poll()
             } else {
                 self.connect(device)
                 self.pendingToast = message
@@ -425,6 +523,8 @@ final class AppModel: NSObject, ObservableObject {
                 FileHandle.standardError.write(Data("[render] flushing, error: \(String(describing: renderer.error))\n".utf8))
                 #endif
                 renderer.flush()
+                // Frames until the next key frame would be garbage: ask for one now.
+                newSession.send(ControlMessage.resetVideo)
             }
             renderer.enqueue(sample)
             #if DEBUG
@@ -483,6 +583,10 @@ final class AppModel: NSObject, ObservableObject {
         var forgotten = forgottenPhones
         forgotten.insert(hw)
         forgottenPhones = forgotten
+        var names = phoneNames
+        names.removeValue(forKey: hw)
+        phoneNames = names
+        if preferredPhone == hw { preferredPhone = nil }
 
         var map = wirelessMap
         let addresses = Set(map.filter { $0.value == hw }.map(\.key)).union(device.isWireless ? [device.serial] : [])
@@ -512,6 +616,70 @@ final class AppModel: NSObject, ObservableObject {
 
     private var lastDevice: ADBDevice?
 
+    // MARK: - Several phones
+
+    struct PhoneChoice {
+        let name: String
+        let device: ADBDevice?   // nil: remembered, but not reachable right now
+        let isCurrent: Bool
+    }
+
+    /// Names of the phones AirDoxx has mirrored, by hardware serial.
+    private var phoneNames: [String: String] {
+        get { defaults.dictionary(forKey: "phoneNames") as? [String: String] ?? [:] }
+        set { defaults.set(newValue, forKey: "phoneNames") }
+    }
+
+    /// The phone used last; picked automatically when several are reachable.
+    private var preferredPhone: String? {
+        get { defaults.string(forKey: "preferredPhone") }
+        set { defaults.set(newValue, forKey: "preferredPhone") }
+    }
+
+    /// Every phone AirDoxx knows: reachable ones first, then remembered ones that are away.
+    func phoneChoices() -> [PhoneChoice] {
+        if let found = try? ADB.shared.devices() { devices = found }
+        let forgotten = forgottenPhones
+        let ready = dedupe(devices.filter(\.isReady)).filter { !forgotten.contains(hardwareSerial(of: $0)) }
+        let names = phoneNames
+        let current = session.map { hardwareSerial(of: $0.device) }
+        var choices = ready.map { d -> PhoneChoice in
+            let hw = hardwareSerial(of: d)
+            return PhoneChoice(name: names[hw] ?? d.displayName, device: d, isCurrent: hw == current)
+        }
+        let present = Set(ready.map { hardwareSerial(of: $0) })
+        for (hw, name) in names.sorted(by: { $0.value < $1.value })
+            where !present.contains(hw) && !forgotten.contains(hw) {
+            choices.append(PhoneChoice(name: name, device: nil, isCurrent: false))
+        }
+        return choices
+    }
+
+    func switchPhone(to device: ADBDevice) {
+        let hw = hardwareSerial(of: device)
+        if let s = session {
+            guard hardwareSerial(of: s.device) != hw else { return }
+            restoreRotationIfNeeded(wait: true)
+            s.stop()
+            endSession(s)
+        }
+        preferredPhone = hw
+        reconnectAttempts = 0
+        presentation = .phone
+        onShowPhone?()
+        startMirroring(device)
+    }
+
+    func switchToNextPhone() {
+        let reachable = phoneChoices().filter { $0.device != nil }
+        guard reachable.count > 1 else {
+            windowController.showToast("No other phone is connected")
+            return
+        }
+        let index = reachable.firstIndex(where: \.isCurrent) ?? -1
+        if let next = reachable[(index + 1) % reachable.count].device { switchPhone(to: next) }
+    }
+
     /// Hardware serials the user asked to forget. Cleared when they set the phone up again.
     private var forgottenPhones: Set<String> {
         get { Set(defaults.stringArray(forKey: "forgottenPhones") ?? []) }
@@ -523,6 +691,10 @@ final class AppModel: NSObject, ObservableObject {
         session = nil
         nowPlaying.deactivate()
         notifications.stop()
+        phoneStatus?.stop(); phoneStatus = nil
+        windowController.updateStatus("")
+        if isRecording { recorder?.stop(); isRecording = false; windowController.updateRecordButton(recording: false) }
+        recorder = nil
         clipboardTimer?.invalidate()
         clipboardTimer = nil
         secureMonitor?.stop()
@@ -640,9 +812,16 @@ final class AppModel: NSObject, ObservableObject {
 
     func syncClipboardToPhone() {
         let pb = NSPasteboard.general
-        guard let s = session, pb.changeCount != lastPasteboardChange,
-              let text = pb.string(forType: .string) else { return }
+        guard let s = session, pb.changeCount != lastPasteboardChange else { return }
         lastPasteboardChange = pb.changeCount
+        // Skip passwords and other items their apps mark as private or temporary.
+        let types = Set((pb.types ?? []).map(\.rawValue))
+        guard types.isDisjoint(with: ["org.nspasteboard.ConcealedType", "org.nspasteboard.TransientType"]),
+              let text = pb.string(forType: .string), !text.isEmpty else { return }
+        guard text.utf8.count <= MirrorSession.clipboardMaxBytes else {
+            windowController.showToast("That copy is too large to send to the phone")
+            return
+        }
         s.setClipboard(text, paste: false)
     }
 
@@ -682,6 +861,77 @@ final class AppModel: NSObject, ObservableObject {
         }
         monitor.start()
         secureMonitor = monitor
+    }
+
+    // MARK: - Status, recording, keep-on-top, OTP
+
+    var copyCodes: Bool {
+        get { defaults.object(forKey: "copyCodes") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "copyCodes"); notifications.copyCodes = newValue }
+    }
+
+    private func startPhoneStatus(for session: MirrorSession) {
+        let status = PhoneStatus(serial: session.device.serial)
+        status.onChange = { [weak self, weak session] snap in
+            guard let self, let session, session === self.session else { return }
+            self.windowController.updateStatus(Self.statusText(snap))
+        }
+        status.onUnreachable = { [weak self, weak session] in
+            // adb can keep a dead Wi-Fi connection "open" for minutes. Don't sit on a frozen picture.
+            guard let self, let session, session === self.session else { return }
+            session.stop()
+            self.session(session, didEndWithError: "The phone stopped responding.")
+        }
+        status.start()
+        phoneStatus = status
+    }
+
+    private static func statusText(_ s: PhoneStatus.Snapshot) -> String {
+        var parts: [String] = []
+        if s.batteryLevel >= 0 { parts.append("\(s.charging ? "⚡︎" : "")\(s.batteryLevel)%") }
+        if s.onWiFi { parts.append("􀙇 Wi-Fi") } else if s.signal >= 0 { parts.append(String(repeating: "|", count: max(1, s.signal))) }
+        return parts.joined(separator: "   ")
+    }
+
+    func toggleRecording() {
+        guard let serial = session?.device.serial else { return }
+        if isRecording {
+            recorder?.stop()
+        } else {
+            let rec = ScreenRecorder(serial: serial)
+            rec.onFinished = { [weak self] url in
+                self?.isRecording = false
+                self?.windowController.updateRecordButton(recording: false)
+                if let url {
+                    self?.windowController.showToast("Recording saved to Movies")
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                } else {
+                    self?.windowController.showToast("Recording failed")
+                }
+            }
+            rec.start()
+            recorder = rec
+            isRecording = true
+            windowController.showToast("Recording…")
+        }
+        windowController.updateRecordButton(recording: isRecording)
+    }
+
+    func toggleOnTop() {
+        isOnTop.toggle()
+        windowController.updatePinButton(onTop: isOnTop)
+        windowController.showToast(isOnTop ? "Window stays on top" : "Window no longer on top")
+    }
+
+    private var lastCode: String?
+    private func handleCode(_ code: String, app: String) {
+        guard code != lastCode else { return }
+        lastCode = code
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(code, forType: .string)
+        lastPasteboardChange = pb.changeCount
+        windowController.showToast("Copied code \(code) from \(app)")
     }
 
     // MARK: - Mac special keys -> phone
@@ -736,6 +986,7 @@ final class AppModel: NSObject, ObservableObject {
     /// Puts a USB-connected phone into wireless adb (port 5555) and connects to it over Wi-Fi.
     /// Completion (main thread): the "ip:port" serial on success, else nil and a message.
     private func enableWireless(for device: ADBDevice, completion: @escaping (String?, String) -> Void) {
+        let hardware = hardwareSerial(of: device)
         work.async { [weak self] in
             let adb = ADB.shared
             func finish(_ address: String?, _ message: String) {
@@ -758,7 +1009,7 @@ final class AppModel: NSObject, ObservableObject {
                    (try? adb.devices())?.contains(where: { $0.serial == address && $0.isReady }) == true {
                     DispatchQueue.main.async {
                         var map = self?.wirelessMap ?? [:]
-                        map[address] = device.serial
+                        map[address] = hardware
                         self?.wirelessMap = map
                         self?.lastWirelessAddress = address
                     }
@@ -782,7 +1033,7 @@ final class AppModel: NSObject, ObservableObject {
             return
         }
         if let s = session { s.stop(); endSession(s) }
-        wirelessAttempted.insert(device.serial)
+        wirelessAttempted.insert(hardwareSerial(of: device))
         state = .connecting("\(device.displayName) over Wi-Fi")
         enableWireless(for: device) { [weak self] address, message in
             guard let self else { return }
@@ -816,8 +1067,13 @@ final class AppModel: NSObject, ObservableObject {
                 if ok {
                     self.connect(device)
                 } else {
-                    self.state = .failed("Your Android phone is not available",
-                                         "Lost the Wi-Fi connection. Make sure the phone is unlocked once and on the same Wi-Fi as this Mac, or plug it in with USB.\n\n\(error)")
+                    // Keep looking in the background: mirroring resumes by itself as soon as
+                    // the phone is reachable again (same Wi-Fi, new Wi-Fi, or its hotspot).
+                    self.work.async { _ = try? ADB.shared.run(["disconnect", device.serial], timeout: 4) }
+                    self.reconnectAttempts = 0
+                    self.autoConnect = true
+                    self.searchStartedAt = .distantPast
+                    self.state = .searching
                     if self.presentation != .setup { self.presentation = .unavailable("") }
                 }
             }
@@ -869,11 +1125,19 @@ extension AppModel: MirrorSessionDelegate {
         lastDevice = session.device
         state = .mirroring(name)
         reconnectAttempts = 0
+        let hardware = hardwareSerial(of: session.device)
+        var names = phoneNames
+        names[hardware] = name
+        phoneNames = names
+        preferredPhone = hardware
         if presentation != .phone {
             if presentation == .setup { setupComplete = true }
             presentation = .phone
         }
         notifications.start(serial: session.device.serial)
+        notifications.copyCodes = copyCodes
+        notifications.onCode = { [weak self] code, app in self?.handleCode(code, app: app) }
+        startPhoneStatus(for: session)
         restoreRotationIfNeeded()   // a previous session may have ended while in forced landscape
         NotificationBridge.isDenied { [weak self] denied in
             guard denied else { return }
@@ -913,8 +1177,20 @@ extension AppModel: MirrorSessionDelegate {
             reconnectWireless(session.device, error: detail)
             return
         }
+        let mismatch = detail.contains("Unknown server option") || detail.contains("version")
+        if session.device.isWireless, !mismatch {
+            // Don't give up on a wireless phone: keep looking and resume when it's back.
+            let serial = session.device.serial
+            work.async { _ = try? ADB.shared.run(["disconnect", serial], timeout: 4) }
+            reconnectAttempts = 0
+            autoConnect = true
+            searchStartedAt = .distantPast
+            state = .searching
+            if presentation != .setup { presentation = .unavailable(detail) }
+            return
+        }
         autoConnect = false
-        let headline = detail.contains("Unknown server option") || detail.contains("version")
+        let headline = mismatch
             ? "Mirroring component version mismatch"
             : "Your Android phone is not available"
         state = .failed(headline, detail)

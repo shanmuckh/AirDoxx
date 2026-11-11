@@ -1,0 +1,17 @@
+AirDoxx 2.3: Wi-Fi roaming, lid close/open, phone switcher, custom shortcuts, CI
+
+- Keeps a Wi-Fi adb link (port 5555) alongside Wireless debugging, which Android
+  switches off when the phone leaves its network; finds the phone again at its
+  new address (mDNS, saved addresses, hotspot gateway)
+- Lid closed / Mac sleeps: mirroring stops and the phone gets its screen back;
+  on wake AirDoxx reconnects by itself
+- A lost wireless phone no longer dead-ends: AirDoxx keeps looking and resumes
+- Hardening: detects a phone that stopped answering, ends the session when the
+  control channel dies, asks for a key frame after a decoder reset, bounds
+  packet sizes, skips private/oversized clipboard items
+- Switch Phone menu and Switch to Next Phone; remembers the phone used last
+- Keyboard Shortcuts window: remap the phone, capture and window commands
+- OTP auto-copy, battery/signal in the title bar, screen recording, keep on top
+- GitHub Actions: builds the universal DMG on every push; attaches it on a tag
+- Website: hosted install.sh (curl | bash), "New in 2.3" section, new tiles
+- Version 2.3.0

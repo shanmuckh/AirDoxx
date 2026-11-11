@@ -224,3 +224,30 @@ addEventListener('keydown', (e) => {
   key.classList.add('pressed');
   setTimeout(() => key.classList.remove('pressed'), 240);
 });
+
+/* ---------- download tabs + copy ---------- */
+(() => {
+  const tabs = $$('.dl-tab');
+  tabs.forEach((tab) => tab.addEventListener('click', () => {
+    tabs.forEach((t) => t.classList.toggle('active', t === tab));
+    $$('.dl-panel').forEach((p) => { p.hidden = p.dataset.panel !== tab.dataset.tab; });
+  }));
+  const copy = document.querySelector('#termCopy');
+  copy?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(document.querySelector('#termCmd').textContent);
+      copy.textContent = 'Copied'; copy.classList.add('done');
+      setTimeout(() => { copy.textContent = 'Copy'; copy.classList.remove('done'); }, 1800);
+    } catch (e) { copy.textContent = 'Press Cmd-C'; }
+  });
+})();
+
+/* ---------- hero: copy the one-line install ---------- */
+$$('.one-liner').forEach((btn) => btn.addEventListener('click', async () => {
+  const hint = $('.one-liner-hint', btn);
+  try {
+    await navigator.clipboard.writeText(btn.dataset.copy);
+    hint.textContent = 'Copied – paste in Terminal'; btn.classList.add('done');
+    setTimeout(() => { hint.textContent = 'Copy'; btn.classList.remove('done'); }, 2200);
+  } catch (e) { location.hash = '#download'; }
+}));

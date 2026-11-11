@@ -17,6 +17,9 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
 
     /// Called (main thread) when the user clicks a forwarded notification.
     var onOpen: ((_ package: String) -> Void)?
+    /// Called (main thread) when a one-time verification code is detected in a notification.
+    var onCode: ((_ code: String, _ app: String) -> Void)?
+    var copyCodes = true
 
     private var serial: String?
     private var timer: DispatchSourceTimer?
@@ -138,7 +141,13 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
 
         if firstPass { Self.log("primed with \(records.count) existing notifications") }
         if !fresh.isEmpty { Self.log("forwarding \(fresh.count): \(fresh.map(\.pkg).joined(separator: ", "))") }
-        fresh.forEach(post)
+        for n in fresh {
+            if copyCodes, let code = Self.extractCode(from: "\(n.title) \(n.text)") {
+                let app = Self.appName(for: n.pkg)
+                DispatchQueue.main.async { self.onCode?(code, app) }
+            }
+            post(n)
+        }
     }
 
     static func shouldForward(_ n: PhoneNotification) -> Bool {
@@ -206,6 +215,27 @@ final class NotificationBridge: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().add(request) { error in
             if let error { Self.log("post failed for \(n.pkg): \(error.localizedDescription)") }
         }
+    }
+
+    /// Finds a one-time passcode (OTP) in notification text: a 4–8 digit run near a word like
+    /// "code", "OTP", "verification", "password", or "PIN". Avoids plain amounts and phone numbers.
+    static func extractCode(from text: String) -> String? {
+        let lower = text.lowercased()
+        let cues = ["otp", "code", "verification", "verify", "one-time", "one time", "passcode",
+                    "password", "2fa", "pin", "login", "sign-in", "sign in", "authenticat"]
+        guard cues.contains(where: { lower.contains($0) }) else { return nil }
+        // Candidate codes: standalone 4–8 digit groups (optionally with a dash, e.g. 123-456).
+        let pattern = "(?<![0-9])([0-9]{3}[- ]?[0-9]{3}|[0-9]{4,8})(?![0-9])"
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let ns = text as NSString
+        let matches = re.matches(in: text, range: NSRange(location: 0, length: ns.length))
+        for m in matches {
+            let code = ns.substring(with: m.range(at: 1)).replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "")
+            // Skip years and obvious non-codes.
+            if code.count == 4, let y = Int(code), (1900...2100).contains(y), !lower.contains("code") && !lower.contains("otp") { continue }
+            if (4...8).contains(code.count) { return code }
+        }
+        return nil
     }
 
     static func appName(for pkg: String) -> String {

@@ -1,0 +1,117 @@
+name: Build
+
+# Every push and pull request: build the universal app and DMG, and keep the DMG as an artifact.
+# A version tag (v2.3.0): also attach the DMG to that GitHub release, unless the release already
+# has one (scripts/publish_release.sh uploads the locally built DMG).
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SCRCPY_VERSION: "5.0.1"
+  SCRCPY_SERVER_SHA256: 764eb6f79811d5211fe9df341120882ba9994c7a61b897d7bf3fb662e53bc536
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          app="$(sed -nE 's/^APP_VERSION="(.*)"/\1/p' scripts/build_app.sh)"
+          tag="${GITHUB_REF_NAME#v}"
+          if [[ "$app" != "$tag" ]]; then
+            echo "::error::Tag v$tag does not match APP_VERSION=$app in scripts/build_app.sh"
+            exit 1
+          fi
+
+      - name: Tools (adb, dmgbuild)
+        run: |
+          brew install --cask android-platform-tools
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet dmgbuild
+          echo "DMGBUILD=$RUNNER_TEMP/venv/bin/dmgbuild" >> "$GITHUB_ENV"
+
+      # The app speaks one exact scrcpy protocol version, so pin the server instead of
+      # taking whatever Homebrew ships today.
+      - name: scrcpy server (pinned)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/scrcpy-server" \
+            "https://github.com/Genymobile/scrcpy/releases/download/v${SCRCPY_VERSION}/scrcpy-server-v${SCRCPY_VERSION}"
+          echo "${SCRCPY_SERVER_SHA256}  $RUNNER_TEMP/scrcpy-server" | shasum -a 256 -c -
+          echo "SCRCPY_SERVER_PATH=$RUNNER_TEMP/scrcpy-server" >> "$GITHUB_ENV"
+          echo "SCRCPY_SERVER_VERSION=${SCRCPY_VERSION}" >> "$GITHUB_ENV"
+
+      # Optional. With these two secrets the CI build is signed with the same identity as local
+      # builds, so macOS keeps the Accessibility permission when people update. Without them the
+      # build script makes a throwaway identity. See scripts/export_signing_identity.sh.
+      - name: Signing identity
+        env:
+          SIGNING_P12_BASE64: ${{ secrets.SIGNING_P12_BASE64 }}
+          SIGNING_P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+        run: |
+          if [[ -z "$SIGNING_P12_BASE64" || -z "$SIGNING_P12_PASSWORD" ]]; then
+            echo "::notice::No signing secrets set: this build gets a one-off signature."
+            exit 0
+          fi
+          mkdir -p .signing
+          KC="$PWD/.signing/AndroidMirroring.keychain-db"
+          printf '%s' "$SIGNING_P12_PASSWORD" > .signing/keychain-password
+          printf '%s' "$SIGNING_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/id.p12"
+          SEARCH_LIST="$(security list-keychains -d user | tr -d '"')"
+          security create-keychain -p "$SIGNING_P12_PASSWORD" "$KC"
+          security list-keychains -d user -s $SEARCH_LIST
+          security unlock-keychain -p "$SIGNING_P12_PASSWORD" "$KC"
+          security import "$RUNNER_TEMP/id.p12" -k "$KC" -P "$SIGNING_P12_PASSWORD" -T /usr/bin/codesign >/dev/null
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$SIGNING_P12_PASSWORD" "$KC" >/dev/null
+          rm -f "$RUNNER_TEMP/id.p12"
+
+      - name: Build app and DMG
+        run: ./scripts/build_app.sh --release
+
+      - name: Check the result
+        run: |
+          codesign --verify --deep --strict build/AirDoxx.app
+          lipo -archs build/AirDoxx.app/Contents/MacOS/AirDoxx | grep -q arm64
+          lipo -archs build/AirDoxx.app/Contents/MacOS/AirDoxx | grep -q x86_64
+          test -f build/AirDoxx.app/Contents/Resources/scrcpy-server
+          test -x build/AirDoxx.app/Contents/Resources/platform-tools/adb
+          bash -n docs/install.sh
+          cat build/AirDoxx.dmg.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AirDoxx-dmg
+          path: |
+            build/AirDoxx.dmg
+            build/AirDoxx.dmg.sha256
+          if-no-files-found: error
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --title "AirDoxx ${tag#v}" --generate-notes --verify-tag
+          fi
+          if gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx AirDoxx.dmg; then
+            echo "::notice::Release $tag already has AirDoxx.dmg; leaving it as it is."
+          else
+            gh release upload "$tag" build/AirDoxx.dmg
+          fi
